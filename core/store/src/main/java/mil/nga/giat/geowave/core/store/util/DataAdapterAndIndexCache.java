@@ -19,11 +19,13 @@ import mil.nga.giat.geowave.core.index.ByteArrayId;
 
 public class DataAdapterAndIndexCache
 {
+
 	private static Map<String, DataAdapterAndIndexCache> CACHE_MAP = new HashMap<String, DataAdapterAndIndexCache>();
 
 	public static synchronized DataAdapterAndIndexCache getInstance(
 			final String cacheId ) {
-		DataAdapterAndIndexCache instance = CACHE_MAP.get(cacheId);
+		DataAdapterAndIndexCache instance = CACHE_MAP.get(
+				cacheId);
 		if (instance == null) {
 			instance = new DataAdapterAndIndexCache();
 			CACHE_MAP.put(
@@ -35,18 +37,23 @@ public class DataAdapterAndIndexCache
 
 	private final Set<DataAdapterAndIndex> cache = new HashSet<DataAdapterAndIndex>();
 
+	// TODO: there should techinically be a notion of geowave datastore in here,
+	// as multiple different datastores (perhaps simply different gwNamespaces)
+	// could use the same adapter and index
 	public synchronized boolean add(
 			final ByteArrayId adapterId,
 			final String indexId ) {
-		if (cache.contains(new DataAdapterAndIndex(
-				adapterId,
-				indexId))) {
+		if (cache.contains(
+				new DataAdapterAndIndex(
+						adapterId,
+						indexId))) {
 			return true;
 		}
 		else {
-			cache.add(new DataAdapterAndIndex(
-					adapterId,
-					indexId));
+			cache.add(
+					new DataAdapterAndIndex(
+							adapterId,
+							indexId));
 			return false;
 		}
 	}
@@ -90,7 +97,8 @@ public class DataAdapterAndIndexCache
 					return false;
 				}
 			}
-			else if (!adapterId.equals(other.adapterId)) {
+			else if (!adapterId.equals(
+					other.adapterId)) {
 				return false;
 			}
 			if (indexId == null) {
@@ -98,7 +106,8 @@ public class DataAdapterAndIndexCache
 					return false;
 				}
 			}
-			else if (!indexId.equals(other.indexId)) {
+			else if (!indexId.equals(
+					other.indexId)) {
 				return false;
 			}
 			return true;

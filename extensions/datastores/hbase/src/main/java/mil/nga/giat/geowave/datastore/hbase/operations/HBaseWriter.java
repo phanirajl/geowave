@@ -24,7 +24,8 @@ import mil.nga.giat.geowave.core.store.operations.Writer;
 public class HBaseWriter implements
 		Writer
 {
-	private final static Logger LOGGER = Logger.getLogger(HBaseWriter.class);
+	private final static Logger LOGGER = Logger.getLogger(
+			HBaseWriter.class);
 	private final BufferedMutator mutator;
 	private final HBaseOperations operations;
 	private final String tableName;
@@ -65,8 +66,9 @@ public class HBaseWriter implements
 	@Override
 	public void write(
 			final GeoWaveRow[] rows ) {
-		for (GeoWaveRow row : rows) {
-			write(row);
+		for (final GeoWaveRow row : rows) {
+			write(
+					row);
 		}
 	}
 
@@ -81,19 +83,16 @@ public class HBaseWriter implements
 					tableName);
 		}
 
-		String columnFamily = StringUtils.stringFromBinary(row.getAdapterId());
-
-		operations.verifyOrAddColumnFamily(
-				columnFamily,
-				tableName);
-
-		writeMutations(rowToMutation(row));
+		writeMutations(
+				rowToMutation(
+						row));
 	}
 
 	private void writeMutations(
 			final RowMutations rowMutation ) {
 		try {
-			mutator.mutate(rowMutation.getMutations());
+			mutator.mutate(
+					rowMutation.getMutations());
 		}
 		catch (final IOException e) {
 			LOGGER.error(
@@ -104,12 +103,18 @@ public class HBaseWriter implements
 
 	private static RowMutations rowToMutation(
 			final GeoWaveRow row ) {
-		final byte[] rowBytes = GeoWaveKey.getCompositeId(row);
+		final byte[] rowBytes = GeoWaveKey.getCompositeId(
+				row);
 		final RowMutations mutation = new RowMutations(
 				rowBytes);
 		for (final GeoWaveValue value : row.getFieldValues()) {
+			// we use our own timestamp so that we can retain multiple versions
+			// (otherwise timestamps will be applied on the server side in
+			// batches and if the same row exists within a batch we will not
+			// retain multiple versions)
 			final Put put = new Put(
-					rowBytes);
+					rowBytes,
+					System.currentTimeMillis());
 
 			put.addColumn(
 					row.getAdapterId(),
@@ -117,15 +122,19 @@ public class HBaseWriter implements
 					value.getValue());
 
 			if ((value.getVisibility() != null) && (value.getVisibility().length > 0)) {
-				put.setCellVisibility(new CellVisibility(
-						StringUtils.stringFromBinary(value.getVisibility())));
+				put.setCellVisibility(
+						new CellVisibility(
+								StringUtils.stringFromBinary(
+										value.getVisibility())));
 			}
 
 			try {
-				mutation.add(put);
+				mutation.add(
+						put);
 			}
-			catch (IOException e) {
-				LOGGER.error("Error creating HBase row mutation: " + e.getMessage());
+			catch (final IOException e) {
+				LOGGER.error(
+						"Error creating HBase row mutation: " + e.getMessage());
 			}
 		}
 

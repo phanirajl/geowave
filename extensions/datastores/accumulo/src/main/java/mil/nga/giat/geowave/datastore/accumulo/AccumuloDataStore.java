@@ -33,12 +33,14 @@ import mil.nga.giat.geowave.core.store.metadata.DataStatisticsStoreImpl;
 import mil.nga.giat.geowave.core.store.metadata.IndexStoreImpl;
 import mil.nga.giat.geowave.core.store.query.DistributableQuery;
 import mil.nga.giat.geowave.core.store.query.QueryOptions;
+import mil.nga.giat.geowave.core.store.server.RowMergingAdapterOptionProvider;
+import mil.nga.giat.geowave.core.store.server.ServerOpHelper;
+import mil.nga.giat.geowave.core.store.server.ServerSideOperations;
 import mil.nga.giat.geowave.core.store.util.DataAdapterAndIndexCache;
 import mil.nga.giat.geowave.datastore.accumulo.cli.config.AccumuloOptions;
 import mil.nga.giat.geowave.datastore.accumulo.index.secondary.AccumuloSecondaryIndexDataStore;
 import mil.nga.giat.geowave.datastore.accumulo.mapreduce.AccumuloSplitsProvider;
 import mil.nga.giat.geowave.datastore.accumulo.operations.AccumuloOperations;
-import mil.nga.giat.geowave.datastore.accumulo.util.AccumuloUtils;
 import mil.nga.giat.geowave.mapreduce.BaseMapReduceDataStore;
 
 /**
@@ -55,10 +57,8 @@ import mil.nga.giat.geowave.mapreduce.BaseMapReduceDataStore;
 public class AccumuloDataStore extends
 		BaseMapReduceDataStore
 {
-	private final static Logger LOGGER = LoggerFactory.getLogger(AccumuloDataStore.class);
-
-	private final AccumuloOperations accumuloOperations;
-	private final AccumuloOptions accumuloOptions;
+	private final static Logger LOGGER = LoggerFactory.getLogger(
+			AccumuloDataStore.class);
 
 	private final AccumuloSplitsProvider splitsProvider = new AccumuloSplitsProvider();
 
@@ -119,9 +119,8 @@ public class AccumuloDataStore extends
 				accumuloOperations,
 				accumuloOptions);
 
-		this.accumuloOperations = accumuloOperations;
-		this.accumuloOptions = accumuloOptions;
-		secondaryIndexDataStore.setDataStore(this);
+		secondaryIndexDataStore.setDataStore(
+				this);
 	}
 
 	@Override
@@ -135,21 +134,29 @@ public class AccumuloDataStore extends
 			if (adapter instanceof RowMergingDataAdapter) {
 				if (!DataAdapterAndIndexCache.getInstance(
 						RowMergingAdapterOptionProvider.ROW_MERGING_ADAPTER_CACHE_ID).add(
-						adapter.getAdapterId(),
-						indexName)) {
-					AccumuloUtils.attachRowMergingIterators(
+								adapter.getAdapterId(),
+								indexName)) {
+					if (baseOptions.isCreateTable()) {
+						((AccumuloOperations) baseOperations).createTable(
+								indexName,
+								true,
+								baseOptions.isEnableBlockCache());
+					}
+					ServerOpHelper.addServerSideRowMerging(
 							((RowMergingDataAdapter<?, ?>) adapter),
-							accumuloOperations,
-							accumuloOptions,
+							(ServerSideOperations) baseOperations,
+							RowMergingCombiner.class.getName(),
+							RowMergingVisibilityCombiner.class.getName(),
 							indexName);
 				}
 			}
 
 			final byte[] adapterId = adapter.getAdapterId().getBytes();
-			if (accumuloOptions.isUseLocalityGroups() && !accumuloOperations.localityGroupExists(
-					indexName,
-					adapterId)) {
-				accumuloOperations.addLocalityGroup(
+			if (((AccumuloOptions) baseOptions).isUseLocalityGroups()
+					&& !((AccumuloOperations) baseOperations).localityGroupExists(
+							indexName,
+							adapterId)) {
+				((AccumuloOperations) baseOperations).addLocalityGroup(
 						indexName,
 						adapterId);
 			}
@@ -174,7 +181,7 @@ public class AccumuloDataStore extends
 			throws IOException,
 			InterruptedException {
 		return splitsProvider.getSplits(
-				accumuloOperations,
+				baseOperations,
 				query,
 				queryOptions,
 				adapterStore,
