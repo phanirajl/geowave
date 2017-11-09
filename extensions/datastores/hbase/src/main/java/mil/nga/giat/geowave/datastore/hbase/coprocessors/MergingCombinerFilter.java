@@ -20,22 +20,15 @@ import mil.nga.giat.geowave.core.index.Mergeable;
 import mil.nga.giat.geowave.core.index.PersistenceUtils;
 import mil.nga.giat.geowave.core.store.adapter.RowMergingDataAdapter.RowTransform;
 
-public class MergeDataMessage extends
+public class MergingCombinerFilter extends
 		FilterBase
 {
-	private final static Logger LOGGER = Logger.getLogger(MergeDataMessage.class);
+	private final static Logger LOGGER = Logger.getLogger(MergingCombinerFilter.class);
 
-	// TEST ONLY!
-	static {
-		LOGGER.setLevel(Level.DEBUG);
-	}
-
-	private ByteArrayId tableName;
-	private ByteArrayId adapterId;
 	private RowTransform transformData;
 	private HashMap<String, String> options;
 
-	public MergeDataMessage() {
+	public MergingCombinerFilter() {
 
 	}
 
@@ -66,7 +59,7 @@ public class MergeDataMessage extends
 		ignored.add(mergedResult);
 	}
 
-	public static MergeDataMessage parseFrom(
+	public static MergingCombinerFilter parseFrom(
 			final byte[] pbBytes )
 			throws DeserializationException {
 		final ByteBuffer buf = ByteBuffer.wrap(pbBytes);
@@ -87,10 +80,7 @@ public class MergeDataMessage extends
 		final byte[] optionsBytes = new byte[pbBytes.length - transformLength - adapterLength - tableLength - 12];
 		buf.get(optionsBytes);
 
-		MergeDataMessage mergingFilter = new MergeDataMessage();
-
-		mergingFilter.setTableName(new ByteArrayId(
-				tableBytes));
+		MergingCombinerFilter mergingFilter = new MergingCombinerFilter();
 
 		mergingFilter.setAdapterId(new ByteArrayId(
 				adapterBytes));
@@ -136,25 +126,7 @@ public class MergeDataMessage extends
 
 		return buf.array();
 	}
-
-	public ByteArrayId getTableName() {
-		return tableName;
-	}
-
-	public void setTableName(
-			ByteArrayId tableName ) {
-		this.tableName = tableName;
-	}
-
-	public ByteArrayId getAdapterId() {
-		return adapterId;
-	}
-
-	public void setAdapterId(
-			ByteArrayId adapterId ) {
-		this.adapterId = adapterId;
-	}
-
+	
 	public RowTransform getTransformData() {
 		return transformData;
 	}

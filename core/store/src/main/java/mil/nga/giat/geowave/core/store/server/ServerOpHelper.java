@@ -106,18 +106,21 @@ public class ServerOpHelper
 						}
 					}
 				}
-				if (mustDelete) {
-					operations.removeServerOp(
-							index,
-							config.getServerOpName(),
-							existingScopes);
-					exists = false;
+				if (configuredOptions == null) {
+					configuredOptions = config.getOptions(
+							new HashMap<String, String>());
 				}
-				if (!exists) {
-					if (configuredOptions == null) {
-						configuredOptions = config.getOptions(
-								new HashMap<String, String>());
-					}
+				if (mustDelete) {
+					operations.updateServerOp(
+							index,
+							config.getServerOpPriority(),
+							config.getServerOpName(),
+							config.getServerOpClass(),
+							configuredOptions,
+							existingScopes,
+							configuredScopes);
+				}
+				else if (!exists) {
 					operations.addServerOp(
 							index,
 							config.getServerOpPriority(),

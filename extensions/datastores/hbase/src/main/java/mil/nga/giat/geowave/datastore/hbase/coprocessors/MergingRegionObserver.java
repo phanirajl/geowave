@@ -47,7 +47,7 @@ public class MergingRegionObserver extends
 	}
 
 	private HashSet<String> mergingTables = new HashSet<>();
-	private HashMap<String, MergeDataMessage> mergingTransformMap = new HashMap<>();
+	private HashMap<String, MergingCombinerFilter> mergingTransformMap = new HashMap<>();
 	//
 	// @Override
 	// public InternalScanner preFlushScannerOpen(
@@ -196,7 +196,7 @@ public class MergingRegionObserver extends
 		return s;
 	}
 
-	MergeDataMessage mdm;
+	MergingCombinerFilter mdm;
 
 	@Override
 	public void start(
@@ -206,7 +206,7 @@ public class MergingRegionObserver extends
 				"test.me");
 		if (test != null) {
 			try {
-				mdm = MergeDataMessage.parseFrom(
+				mdm = MergingCombinerFilter.parseFrom(
 						ByteArrayUtils.byteArrayFromString(
 								test));
 			}
@@ -219,15 +219,15 @@ public class MergingRegionObserver extends
 				e);
 	}
 
-	private MergeDataMessage extractMergeData(
+	private MergingCombinerFilter extractMergeData(
 			Filter checkFilter ) {
-		if (checkFilter instanceof MergeDataMessage) {
-			return (MergeDataMessage) checkFilter;
+		if (checkFilter instanceof MergingCombinerFilter) {
+			return (MergingCombinerFilter) checkFilter;
 		}
 
 		if (checkFilter instanceof FilterList) {
 			for (Filter filter : ((FilterList) checkFilter).getFilters()) {
-				MergeDataMessage mergingFilter = extractMergeData(
+				MergingCombinerFilter mergingFilter = extractMergeData(
 						filter);
 				if (mergingFilter != null) {
 					return mergingFilter;
@@ -238,15 +238,15 @@ public class MergingRegionObserver extends
 		return null;
 	}
 
-	private MergeDataMessage addMergeDataFilter(
+	private MergingCombinerFilter addMergeDataFilter(
 			Filter checkFilter ) {
-		if (checkFilter instanceof MergeDataMessage) {
-			return (MergeDataMessage) checkFilter;
+		if (checkFilter instanceof MergingCombinerFilter) {
+			return (MergingCombinerFilter) checkFilter;
 		}
 
 		if (checkFilter instanceof FilterList) {
 			for (Filter filter : ((FilterList) checkFilter).getFilters()) {
-				MergeDataMessage mergingFilter = extractMergeData(
+				MergingCombinerFilter mergingFilter = extractMergeData(
 						filter);
 				if (mergingFilter != null) {
 					return mergingFilter;
@@ -258,7 +258,7 @@ public class MergingRegionObserver extends
 	}
 
 	private void updateMergingColumnFamilies(
-			MergeDataMessage mergeDataMessage ) {
+			MergingCombinerFilter mergeDataMessage ) {
 		LOGGER.debug(
 				"Updating CF from message: " + mergeDataMessage.getAdapterId().getString());
 

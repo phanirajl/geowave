@@ -1669,34 +1669,7 @@ public class AccumuloOperations implements
 		return null;
 	}
 
-	@Override
-	public Map<String, String> getServerOpOptions(
-			final String index,
-			final String serverOpName,
-			final ServerOpScope scope ) {
-		try {
-			final IteratorSetting setting = connector.tableOperations().getIteratorSetting(
-					getQualifiedTableName(
-							index),
-					serverOpName,
-					toAccumulo(
-							scope));
-			if (setting != null) {
-				return setting.getOptions();
-			}
-		}
-		catch (AccumuloSecurityException | AccumuloException | TableNotFoundException e) {
-			LOGGER.error(
-					"Unable to get iterator options for table '" + index + "'",
-					e);
-		}
-		return Collections.emptyMap();
-	}
-
-	@Override
-	public void removeServerOp(
-			final String index,
-			final String serverOpName,
+	private static EnumSet<IteratorScope> toEnumSet(
 			final ImmutableSet<ServerOpScope> scopes ) {
 		final Collection<IteratorScope> c = Collections2.transform(
 				scopes,
@@ -1726,15 +1699,51 @@ public class AccumuloOperations implements
 			itSet = EnumSet.noneOf(
 					IteratorScope.class);
 		}
+		return itSet;
+	}
+
+	@Override
+	public Map<String, String> getServerOpOptions(
+			final String index,
+			final String serverOpName,
+			final ServerOpScope scope ) {
+		try {
+			final IteratorSetting setting = connector.tableOperations().getIteratorSetting(
+					getQualifiedTableName(
+							index),
+					serverOpName,
+					toAccumulo(
+							scope));
+			if (setting != null) {
+				return setting.getOptions();
+			}
+		}
+		catch (AccumuloSecurityException | AccumuloException | TableNotFoundException e) {
+			LOGGER.error(
+					"Unable to get iterator options for table '" + index + "'",
+					e);
+		}
+		return Collections.emptyMap();
+	}
+
+	@Override
+	public void removeServerOp(
+			final String index,
+			final String serverOpName,
+			final ImmutableSet<ServerOpScope> scopes ) {
+
 		try {
 			connector.tableOperations().removeIterator(
 					getQualifiedTableName(
 							index),
 					serverOpName,
-					itSet);
+					toEnumSet(
+							scopes));
 		}
 		catch (AccumuloSecurityException | AccumuloException | TableNotFoundException e) {
-
+			LOGGER.error(
+					"Unable to remove iterator",
+					e);
 		}
 	}
 
@@ -1745,5 +1754,45 @@ public class AccumuloOperations implements
 			final String name,
 			final String operationClass,
 			final Map<String, String> properties,
-			final ImmutableSet<ServerOpScope> configuredScopes ) {}
+			final ImmutableSet<ServerOpScope> configuredScopes ) {
+		try {
+			connector.tableOperations().attachIterator(
+					getQualifiedTableName(
+							index),
+					new IteratorSetting(
+							priority,
+							name,
+							operationClass,
+							properties),
+					toEnumSet(
+							configuredScopes));
+		}
+		catch (AccumuloSecurityException | AccumuloException | TableNotFoundException e) {
+			LOGGER.error(
+					"Unable to attach iterator",
+					e);
+		}
+	}
+
+	@Override
+	public void updateServerOp(
+			final String index,
+			final int priority,
+			final String name,
+			final String operationClass,
+			final Map<String, String> properties,
+			final ImmutableSet<ServerOpScope> currentScopes,
+			final ImmutableSet<ServerOpScope> newScopes ) {
+		removeServerOp(
+				index,
+				name,
+				currentScopes);
+		addServerOp(
+				index,
+				priority,
+				name,
+				operationClass,
+				properties,
+				newScopes);
+	}
 }
