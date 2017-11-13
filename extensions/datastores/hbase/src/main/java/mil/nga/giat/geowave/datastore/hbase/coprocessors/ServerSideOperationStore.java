@@ -7,8 +7,6 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import org.apache.hadoop.hbase.filter.Filter;
-
 import com.google.common.base.Function;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Collections2;
@@ -52,7 +50,7 @@ class ServerSideOperationStore
 				options);
 	}
 
-	public Collection<Filter> getFilters(
+	public Collection<HBaseServerOp> getOperations(
 			final String namespace,
 			final String qualifier,
 			final ServerOpScope scope ) {
@@ -61,7 +59,7 @@ class ServerSideOperationStore
 						namespace,
 						qualifier));
 		if (tableStore != null) {
-			return tableStore.getFilters(
+			return tableStore.getOperations(
 					scope);
 		}
 		return Collections.emptyList();
@@ -87,16 +85,16 @@ class ServerSideOperationStore
 							options));
 		}
 
-		private Collection<Filter> getFilters(
+		private Collection<HBaseServerOp> getOperations(
 				final ServerOpScope scope ) {
 			return Collections2.filter(
 					Collections2.transform(
 							map.values(),
-							new Function<ServerSideOperationValue, Filter>() {
+							new Function<ServerSideOperationValue, HBaseServerOp>() {
 								@Override
-								public Filter apply(
+								public HBaseServerOp apply(
 										final ServerSideOperationValue input ) {
-									return input.getFilter(
+									return input.getOperation(
 											scope);
 								}
 							}),
@@ -109,7 +107,7 @@ class ServerSideOperationStore
 		private final ImmutableSet<ServerOpScope> scopes;
 		private String className;
 		private Map<String, String> options;
-		private Filter filter;
+		private HBaseServerOp operation;
 
 		public ServerSideOperationValue(
 				final ImmutableSet<ServerOpScope> scopes,
@@ -121,26 +119,31 @@ class ServerSideOperationStore
 			this.options = options;
 		}
 
-		private Filter getFilter(
+		private HBaseServerOp getOperation(
 				final ServerOpScope scope ) {
 			if (!scopes.contains(
 					scope)) {
 				return null;
 			}
 			// defer instantiation of the filter until its required
-			if (filter == null) {
-				filter = createFilter();
+			if (operation == null) {
+				operation = createOperation();
 			}
-			return filter;
+			return operation;
 		}
 
-		private synchronized Filter createFilter() {
+		private synchronized HBaseServerOp createOperation() {
 			// dereference classname and options as they are no longer needed
+			final HBaseServerOp op = PersistenceUtils.classFactory(
+					className,
+					HBaseServerOp.class);
+			if (op != null) {
+				op.init(
+						options);
+			}
 			options = null;
 			className = null;
-			return PersistenceUtils.classFactory(
-					className,
-					Filter.class);
+			return op;
 		}
 	}
 

@@ -1,6 +1,7 @@
 package mil.nga.giat.geowave.datastore.hbase.coprocessors;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -16,8 +17,6 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
-import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.regionserver.InternalScanner;
 import org.apache.hadoop.hbase.regionserver.KeyValueScanner;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
@@ -42,6 +41,43 @@ public class ServerSideOperationsObserver extends
 	public static final String SERVER_OP_PRIORITY_KEY = "priority";
 
 	private ServerSideOperationStore opStore = null;
+	private static final RegionScannerWrapperFactory REGION_SCANNER_FACTORY = new RegionScannerWrapperFactory();
+	private static final InternalScannerWrapperFactory INTERNAL_SCANNER_FACTORY = new InternalScannerWrapperFactory();
+
+	private static interface ScannerWrapperFactory<T extends InternalScanner>
+	{
+		public T createScannerWrapper(
+				Collection<HBaseServerOp> orderedServerOps,
+				T delegate );
+	}
+
+	private static class RegionScannerWrapperFactory implements
+			ScannerWrapperFactory<RegionScanner>
+	{
+
+		@Override
+		public RegionScanner createScannerWrapper(
+				final Collection<HBaseServerOp> orderedServerOps,
+				final RegionScanner delegate ) {
+			return new ServerOpRegionScannerWrapper(
+					orderedServerOps,
+					delegate);
+		}
+	}
+
+	private static class InternalScannerWrapperFactory implements
+			ScannerWrapperFactory<InternalScanner>
+	{
+
+		@Override
+		public InternalScanner createScannerWrapper(
+				final Collection<HBaseServerOp> orderedServerOps,
+				final InternalScanner delegate ) {
+			return new ServerOpInternalScannerWrapper(
+					orderedServerOps,
+					delegate);
+		}
+	}
 
 	@Override
 	public InternalScanner preFlushScannerOpen(
@@ -50,12 +86,22 @@ public class ServerSideOperationsObserver extends
 			final KeyValueScanner memstoreScanner,
 			final InternalScanner s )
 			throws IOException {
-		// TODO Auto-generated method stub
+		if (opStore == null) {
+			return super.preFlushScannerOpen(
+					c,
+					store,
+					memstoreScanner,
+					s);
+		}
 		return super.preFlushScannerOpen(
 				c,
 				store,
 				memstoreScanner,
-				s);
+				wrapScannerWithOps(
+						c.getEnvironment().getRegionInfo().getTable(),
+						s,
+						ServerOpScope.MINOR_COMPACTION,
+						INTERNAL_SCANNER_FACTORY));
 	}
 
 	@Override
@@ -67,14 +113,27 @@ public class ServerSideOperationsObserver extends
 			final long earliestPutTs,
 			final InternalScanner s )
 			throws IOException {
-		// TODO Auto-generated method stub
+		if (opStore == null) {
+			return super.preCompactScannerOpen(
+					c,
+					store,
+					scanners,
+					scanType,
+					earliestPutTs,
+					s);
+		}
+
 		return super.preCompactScannerOpen(
 				c,
 				store,
 				scanners,
 				scanType,
 				earliestPutTs,
-				s);
+				wrapScannerWithOps(
+						c.getEnvironment().getRegionInfo().getTable(),
+						s,
+						ServerOpScope.MAJOR_COMPACTION,
+						INTERNAL_SCANNER_FACTORY));
 	}
 
 	@Override
@@ -89,33 +148,36 @@ public class ServerSideOperationsObserver extends
 					scan,
 					s);
 		}
-		final TableName tableName = e.getEnvironment().getRegionInfo().getTable();
-		final String namespace = tableName.getNamespaceAsString();
-		final String qualifier = tableName.getQualifierAsString();
-		if (!tableName.isSystemTable()) {
-			if (scan != null) {
-				if (tableName.getNameAsString().equals(
-						"mil_nga_giat_geowave_test_SPATIAL_IDX")) {
-					scan.setMaxVersions();
-					Filter f;
-					if (scan.getFilter() != null) {
-						f = new FilterList(
-								mdm,
-								scan.getFilter());
-					}
-					else {
-						f = mdm;
-					}
-					scan.setFilter(
-							f);
-				}
-			}
-		}
 
 		return super.preScannerOpen(
 				e,
 				scan,
-				s);
+				wrapScannerWithOps(
+						e.getEnvironment().getRegionInfo().getTable(),
+						s,
+						ServerOpScope.SCAN,
+						REGION_SCANNER_FACTORY));
+	}
+
+	public <T extends InternalScanner> T wrapScannerWithOps(
+			final TableName tableName,
+			final T scanner,
+			final ServerOpScope scope,
+			final ScannerWrapperFactory<T> factory ) {
+		if (!tableName.isSystemTable()) {
+			final String namespace = tableName.getNamespaceAsString();
+			final String qualifier = tableName.getQualifierAsString();
+			final Collection<HBaseServerOp> orderedServerOps = opStore.getOperations(
+					namespace,
+					qualifier,
+					scope);
+			if (!orderedServerOps.isEmpty()) {
+				return factory.createScannerWrapper(
+						orderedServerOps,
+						scanner);
+			}
+		}
+		return scanner;
 	}
 
 	@Override
@@ -189,40 +251,18 @@ public class ServerSideOperationsObserver extends
 								shortenedIndex),
 						entry.getValue());
 			}
-
+			final String[] uniqueOpSplit = uniqueOp.split(
+					".");
+			opStore.addOperation(
+					uniqueOpSplit[1],
+					uniqueOpSplit[2],
+					uniqueOpSplit[3],
+					priority,
+					scopes,
+					className,
+					optionsShortenedKeys);
 		}
 		super.start(
 				e);
-	}
-
-	private void updateMergingColumnFamilies(
-			final MergingCombinerFilter mergeDataMessage ) {
-		LOGGER.debug(
-				"Updating CF from message: " + mergeDataMessage.getAdapterId().getString());
-
-		final String tableName = mergeDataMessage.getTableName().getString();
-		if (!mergingTables.contains(
-				tableName)) {
-			mergingTables.add(
-					tableName);
-		}
-
-		if (!mergingTransformMap.containsKey(
-				mergeDataMessage.getAdapterId())) {
-			// RowTransform rowTransform = mergeDataMessage.getTransformData();
-			//
-			// try {
-			// rowTransform.initOptions(mergeDataMessage.getOptions());
-			// }
-			// catch (IOException e) {
-			// LOGGER.error(
-			// "Error initializing row transform",
-			// e);
-			// }
-
-			mergingTransformMap.put(
-					tableName,
-					mergeDataMessage);
-		}
 	}
 }
