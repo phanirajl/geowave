@@ -1,11 +1,15 @@
-package mil.nga.giat.geowave.datastore.hbase.coprocessors;
+package mil.nga.giat.geowave.datastore.hbase.server;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicates;
@@ -15,8 +19,10 @@ import com.google.common.collect.ImmutableSet;
 import mil.nga.giat.geowave.core.index.PersistenceUtils;
 import mil.nga.giat.geowave.core.store.server.ServerOpConfig.ServerOpScope;
 
-class ServerSideOperationStore
+public class ServerSideOperationStore
 {
+	private static final Logger LOGGER = LoggerFactory.getLogger(
+			ServerSideOperationStore.class);
 	private final Map<TableKey, TableOpStore> map = new HashMap<>();
 
 	public ServerSideOperationStore() {
@@ -128,6 +134,8 @@ class ServerSideOperationStore
 			// defer instantiation of the filter until its required
 			if (operation == null) {
 				operation = createOperation();
+				options = null;
+				className = null;
 			}
 			return operation;
 		}
@@ -138,11 +146,16 @@ class ServerSideOperationStore
 					className,
 					HBaseServerOp.class);
 			if (op != null) {
-				op.init(
-						options);
+				try {
+					op.init(
+							options);
+				}
+				catch (final IOException e) {
+					LOGGER.warn(
+							"Unable to initialize operation",
+							e);
+				}
 			}
-			options = null;
-			className = null;
 			return op;
 		}
 	}

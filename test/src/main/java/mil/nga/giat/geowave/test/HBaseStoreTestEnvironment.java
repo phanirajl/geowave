@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2013-2017 Contributors to the Eclipse Foundation
- * 
+ *
  * See the NOTICE file distributed with this work for additional
  * information regarding copyright ownership.
  * All rights reserved. This program and the accompanying materials
@@ -15,7 +15,6 @@ import java.security.PrivilegedExceptionAction;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.protobuf.generated.VisibilityLabelsProtos.VisibilityLabelsResponse;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.visibility.ScanLabelGenerator;
@@ -38,7 +37,6 @@ import mil.nga.giat.geowave.core.store.GenericStoreFactory;
 import mil.nga.giat.geowave.core.store.StoreFactoryOptions;
 import mil.nga.giat.geowave.datastore.hbase.HBaseStoreFactoryFamily;
 import mil.nga.giat.geowave.datastore.hbase.cli.config.HBaseRequiredOptions;
-import mil.nga.giat.geowave.datastore.hbase.coprocessors.MergingRegionObserver;
 import mil.nga.giat.geowave.datastore.hbase.util.ConnectionPool;
 import mil.nga.giat.geowave.test.annotation.GeoWaveTestStore.GeoWaveStoreType;
 
@@ -60,7 +58,8 @@ public class HBaseStoreTestEnvironment extends
 		return singletonInstance;
 	}
 
-	private final static Logger LOGGER = LoggerFactory.getLogger(HBaseStoreTestEnvironment.class);
+	private final static Logger LOGGER = LoggerFactory.getLogger(
+			HBaseStoreTestEnvironment.class);
 	public static final String HBASE_PROPS_FILE = "hbase.properties";
 	protected String zookeeper;
 
@@ -80,7 +79,8 @@ public class HBaseStoreTestEnvironment extends
 	@Override
 	protected void initOptions(
 			final StoreFactoryOptions options ) {
-		((HBaseRequiredOptions) options).setZookeeper(zookeeper);
+		((HBaseRequiredOptions) options).setZookeeper(
+				zookeeper);
 	}
 
 	@Override
@@ -103,41 +103,27 @@ public class HBaseStoreTestEnvironment extends
 					e);
 		}
 
-		if (!TestUtils.isSet(zookeeper)) {
-			zookeeper = System.getProperty(ZookeeperTestEnvironment.ZK_PROPERTY_NAME);
+		if (!TestUtils.isSet(
+				zookeeper)) {
+			zookeeper = System.getProperty(
+					ZookeeperTestEnvironment.ZK_PROPERTY_NAME);
 
-			if (!TestUtils.isSet(zookeeper)) {
+			if (!TestUtils.isSet(
+					zookeeper)) {
 				zookeeper = ZookeeperTestEnvironment.getInstance().getZookeeper();
-				LOGGER.debug("Using local zookeeper URL: " + zookeeper);
+				LOGGER.debug(
+						"Using local zookeeper URL: " + zookeeper);
 			}
 		}
 
-		if ((hbaseLocalCluster == null)
-				&& !TestUtils.isSet(System.getProperty(ZookeeperTestEnvironment.ZK_PROPERTY_NAME))) {
+		if ((hbaseLocalCluster == null) && !TestUtils.isSet(
+				System.getProperty(
+						ZookeeperTestEnvironment.ZK_PROPERTY_NAME))) {
 			try {
 				final Configuration conf = new Configuration();
 				conf.set(
 						"hbase.online.schema.update.enable",
 						"true");
-
-				if (enableCoprocessors) {
-					conf.setStrings(
-							CoprocessorHost.REGION_COPROCESSOR_CONF_KEY,
-							MergingRegionObserver.class.getName());
-					// conf.setStrings(
-					// CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY,
-					// SharedDataEndpoint.class.getName());
-
-					String[] testCfs = {
-						"testNoDataMergeStrategy",
-						"testMultipleMergeStrategies_NoDataMergeStrategy",
-						"testMultipleMergeStrategies_SummingMergeStrategy",
-						"testMultipleMergeStrategies_SumAndAveragingMergeStrategy"
-					};
-					conf.setStrings(
-							MergingRegionObserver.COLUMN_FAMILIES_CONFIG_KEY,
-							testCfs);
-				}
 
 				if (enableVisibility) {
 					conf.set(
@@ -165,28 +151,41 @@ public class HBaseStoreTestEnvironment extends
 							VisibilityLabelService.class);
 
 					// Install the VisibilityController as a system processor
-					VisibilityTestUtil.enableVisiblityLabels(conf);
+					VisibilityTestUtil.enableVisiblityLabels(
+							conf);
 				}
 
 				// Start the cluster
 				hbaseLocalCluster = new HbaseLocalCluster.Builder()
 						.setHbaseMasterPort(
-								Integer.parseInt(propertyParser.getProperty(ConfigVars.HBASE_MASTER_PORT_KEY)))
+								Integer.parseInt(
+										propertyParser.getProperty(
+												ConfigVars.HBASE_MASTER_PORT_KEY)))
 						.setHbaseMasterInfoPort(
-								Integer.parseInt(propertyParser.getProperty(ConfigVars.HBASE_MASTER_INFO_PORT_KEY)))
+								Integer.parseInt(
+										propertyParser.getProperty(
+												ConfigVars.HBASE_MASTER_INFO_PORT_KEY)))
 						.setNumRegionServers(
-								Integer.parseInt(propertyParser.getProperty(ConfigVars.HBASE_NUM_REGION_SERVERS_KEY)))
+								Integer.parseInt(
+										propertyParser.getProperty(
+												ConfigVars.HBASE_NUM_REGION_SERVERS_KEY)))
 						.setHbaseRootDir(
-								propertyParser.getProperty(ConfigVars.HBASE_ROOT_DIR_KEY))
+								propertyParser.getProperty(
+										ConfigVars.HBASE_ROOT_DIR_KEY))
 						.setZookeeperPort(
-								Integer.parseInt(propertyParser.getProperty(ConfigVars.ZOOKEEPER_PORT_KEY)))
+								Integer.parseInt(
+										propertyParser.getProperty(
+												ConfigVars.ZOOKEEPER_PORT_KEY)))
 						.setZookeeperConnectionString(
-								propertyParser.getProperty(ConfigVars.ZOOKEEPER_CONNECTION_STRING_KEY))
+								propertyParser.getProperty(
+										ConfigVars.ZOOKEEPER_CONNECTION_STRING_KEY))
 						.setZookeeperZnodeParent(
-								propertyParser.getProperty(ConfigVars.HBASE_ZNODE_PARENT_KEY))
+								propertyParser.getProperty(
+										ConfigVars.HBASE_ZNODE_PARENT_KEY))
 						.setHbaseWalReplicationEnabled(
-								Boolean.parseBoolean(propertyParser
-										.getProperty(ConfigVars.HBASE_WAL_REPLICATION_ENABLED_KEY)))
+								Boolean.parseBoolean(
+										propertyParser.getProperty(
+												ConfigVars.HBASE_WAL_REPLICATION_ENABLED_KEY)))
 						.setHbaseConfiguration(
 								conf)
 						.build();
@@ -195,7 +194,7 @@ public class HBaseStoreTestEnvironment extends
 				if (enableVisibility) {
 
 					// Set valid visibilities for the vis IT
-					Connection conn = ConnectionPool.getInstance().getConnection(
+					final Connection conn = ConnectionPool.getInstance().getConnection(
 							zookeeper);
 					try {
 						SUPERUSER = User.createUserForTesting(
@@ -218,13 +217,14 @@ public class HBaseStoreTestEnvironment extends
 								User.getCurrent().getName());
 
 						// Verify hfile version
-						String hfileVersionStr = conn.getAdmin().getConfiguration().get(
+						final String hfileVersionStr = conn.getAdmin().getConfiguration().get(
 								"hfile.format.version");
 						Assert.assertTrue(
 								"HFile version is incorrect",
-								hfileVersionStr.equals("3"));
+								hfileVersionStr.equals(
+										"3"));
 					}
-					catch (Throwable e) {
+					catch (final Throwable e) {
 						LOGGER.error(
 								"Error creating test user",
 								e);
@@ -241,11 +241,12 @@ public class HBaseStoreTestEnvironment extends
 	}
 
 	private void addLabels(
-			Configuration conf,
-			String[] labels,
-			String user )
+			final Configuration conf,
+			final String[] labels,
+			final String user )
 			throws Exception {
-		PrivilegedExceptionAction<VisibilityLabelsResponse> action = new PrivilegedExceptionAction<VisibilityLabelsResponse>() {
+		final PrivilegedExceptionAction<VisibilityLabelsResponse> action = new PrivilegedExceptionAction<VisibilityLabelsResponse>() {
+			@Override
 			public VisibilityLabelsResponse run()
 					throws Exception {
 				try {
@@ -258,7 +259,7 @@ public class HBaseStoreTestEnvironment extends
 							labels,
 							user);
 				}
-				catch (Throwable t) {
+				catch (final Throwable t) {
 					throw new IOException(
 							t);
 				}
@@ -266,13 +267,15 @@ public class HBaseStoreTestEnvironment extends
 			}
 		};
 
-		SUPERUSER.runAs(action);
+		SUPERUSER.runAs(
+				action);
 	}
 
 	@Override
 	public void tearDown() {
 		try {
-			hbaseLocalCluster.stop(true);
+			hbaseLocalCluster.stop(
+					true);
 		}
 		catch (final Exception e) {
 			LOGGER.warn(

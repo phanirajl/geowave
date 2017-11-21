@@ -76,7 +76,7 @@ public class GeoWaveBasicRasterIT extends
 		startMillis = System.currentTimeMillis();
 		LOGGER.warn("-----------------------------------------");
 		LOGGER.warn("*                                       *");
-		LOGGER.warn("*         RUNNING GeoWaveBasicRasterIT       *");
+		LOGGER.warn("*    RUNNING GeoWaveBasicRasterIT       *");
 		LOGGER.warn("*                                       *");
 		LOGGER.warn("-----------------------------------------");
 	}

@@ -1,4 +1,4 @@
-package mil.nga.giat.geowave.datastore.hbase.coprocessors;
+package mil.nga.giat.geowave.datastore.hbase.server;
 
 class ServerSideOperationKey implements
 		Comparable<ServerSideOperationKey>

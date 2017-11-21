@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -53,7 +54,6 @@ import com.google.protobuf.ByteString;
 
 import mil.nga.giat.geowave.core.index.ByteArrayId;
 import mil.nga.giat.geowave.core.index.ByteArrayRange;
-import mil.nga.giat.geowave.core.index.ByteArrayUtils;
 import mil.nga.giat.geowave.core.index.Mergeable;
 import mil.nga.giat.geowave.core.index.MultiDimensionalCoordinateRangesArray;
 import mil.nga.giat.geowave.core.index.PersistenceUtils;
@@ -64,7 +64,6 @@ import mil.nga.giat.geowave.core.store.adapter.AdapterIndexMappingStore;
 import mil.nga.giat.geowave.core.store.adapter.AdapterStore;
 import mil.nga.giat.geowave.core.store.adapter.DataAdapter;
 import mil.nga.giat.geowave.core.store.adapter.RowMergingDataAdapter;
-import mil.nga.giat.geowave.core.store.adapter.RowMergingDataAdapter.RowTransform;
 import mil.nga.giat.geowave.core.store.adapter.statistics.DataStatistics;
 import mil.nga.giat.geowave.core.store.base.BaseDataStoreUtils;
 import mil.nga.giat.geowave.core.store.entities.GeoWaveMetadata;
@@ -91,7 +90,6 @@ import mil.nga.giat.geowave.datastore.hbase.HBaseRow;
 import mil.nga.giat.geowave.datastore.hbase.cli.config.HBaseOptions;
 import mil.nga.giat.geowave.datastore.hbase.cli.config.HBaseRequiredOptions;
 import mil.nga.giat.geowave.datastore.hbase.coprocessors.AggregationEndpoint;
-import mil.nga.giat.geowave.datastore.hbase.coprocessors.MergingCombinerFilter;
 import mil.nga.giat.geowave.datastore.hbase.coprocessors.ServerSideOperationsObserver;
 import mil.nga.giat.geowave.datastore.hbase.coprocessors.protobuf.AggregationProtos;
 import mil.nga.giat.geowave.datastore.hbase.filters.HBaseNumericIndexStrategyFilter;
@@ -811,6 +809,37 @@ public class HBaseOperations implements
 		return true;
 	}
 
+	public void ensureServerSideOperationsObserverAttached(
+			final ByteArrayId indexId ) {
+		// Use the server-side operations observer
+		// if (options.isVerifyCoprocessors()) {
+		verifyCoprocessor(
+				indexId.getString(),
+				ServerSideOperationsObserver.class.getName(),
+				options.getCoprocessorJar());
+		// }
+	}
+
+	public void createTable(
+			final ByteArrayId indexId,
+			final ByteArrayId adapterId ) {
+		final TableName tableName = getTableName(
+				indexId.getString());
+
+		final String[] columnFamilies = new String[1];
+		columnFamilies[0] = adapterId.getString();
+		try {
+			createTable(
+					columnFamilies,
+					tableName);
+		}
+		catch (final IOException e) {
+			LOGGER.error(
+					"Error creating table: " + indexId.getString(),
+					e);
+		}
+	}
+
 	@Override
 	public Writer createWriter(
 			final ByteArrayId indexId,
@@ -984,130 +1013,9 @@ public class HBaseOperations implements
 		return null;
 	}
 
-	/**
-	 * Called by HBaseDataStore's initOnIndexWriterCreate Hold on to request
-	 * until table is created.
-	 *
-	 * @param indexId
-	 * @param adapterId
-	 * @param rowTransform
-	 */
-	public void stageMergingAdapterForObserver(
-			final ByteArrayId indexId,
-			final ByteArrayId adapterId,
-			final RowTransform rowTransform,
-			final Map<String, String> options ) {
-		final TableName tableName = getTableName(
-				indexId.getString());
-
-		Set<ByteArrayId> adapterIdList = mergingAdapterCache.get(
-				tableName);
-
-		if (adapterIdList == null) {
-			adapterIdList = new HashSet<>();
-			mergingAdapterCache.put(
-					tableName,
-					adapterIdList);
-		}
-
-		adapterIdList.add(
-				adapterId);
-
-		adapterTransformCache.put(
-				adapterId,
-				rowTransform);
-
-		adapterOptionsCache.put(
-				adapterId,
-				options);
-
-		// TODO: Check for table existence and send the data now if possible.
-		try {
-			if (indexExists(
-					indexId)) {
-				sendMergingAdaptersToObserver(
-						tableName);
-			}
-		}
-		catch (final IOException e) {
-			LOGGER.error(
-					"Error checking index existence",
-					e);
-		}
-	}
-
-	/**
-	 * This is called after createTable, so merging adapter info can be
-	 * communicated to the merging observer
-	 *
-	 * @param tableName
-	 */
-	public void sendMergingAdaptersToObserver(
-			final TableName tableName ) {
-		final Set<ByteArrayId> adapterIdList = mergingAdapterCache.get(
-				tableName);
-		if ((adapterIdList != null) && !adapterIdList.isEmpty()) {
-			for (final ByteArrayId adapterId : adapterIdList) {
-				final MergingCombinerFilter mergeDataMessage = new MergingCombinerFilter();
-				mergeDataMessage.setTableName(
-						new ByteArrayId(
-								tableName.getName()));
-				mergeDataMessage.setAdapterId(
-						adapterId);
-				mergeDataMessage.setTransformData(
-						adapterTransformCache.get(
-								adapterId));
-
-				// Serialization requires a HashMap, so we just make one and
-				// transfer options
-				final HashMap<String, String> transformOptions = new HashMap();
-				for (final Entry<String, String> entry : adapterOptionsCache.get(
-						adapterId).entrySet()) {
-					transformOptions.put(
-							entry.getKey(),
-							entry.getValue());
-				}
-				mergeDataMessage.setOptions(
-						transformOptions);
-
-				try {
-					final HTableDescriptor desc = conn.getAdmin().getTableDescriptor(
-							tableName);
-					for (final HColumnDescriptor c : desc.getColumnFamilies()) {
-						System.err.println(
-								c.getMaxVersions());
-					}
-					desc.setConfiguration(
-							"test.me",
-							ByteArrayUtils.byteArrayToString(
-									mergeDataMessage.toByteArray()));
-					conn.getAdmin().modifyTable(
-							tableName,
-							desc);
-					waitForUpdate(
-							conn.getAdmin(),
-							tableName,
-							SLEEP_INTERVAL);
-				}
-				catch (final IOException e) {
-					LOGGER.error(
-							"Error sending merge message",
-							e);
-				}
-
-				LOGGER.debug(
-						"Merge config sent for " + adapterId.getString());
-			}
-
-			adapterIdList.clear();
-			adapterTransformCache.clear();
-		}
-	}
-
 	public Mergeable aggregateServerSide(
 			final ReaderParams readerParams ) {
-		final String tableName = StringUtils.stringFromBinary(
-				readerParams.getIndex().getId().getBytes());
+		final String tableName = readerParams.getIndex().getId().getString();
 
 		try {
 			// Use the row count coprocessor
@@ -1529,36 +1437,45 @@ public class HBaseOperations implements
 			final int priority,
 			final String serverOpName,
 			final String operationClass,
+			final ImmutableSet<ServerOpScope> scopes,
 			final Map<String, String> properties ) {
-		final String basePrefix = String.format(
-				"%s.%s.%s.%s.",
-				ServerSideOperationsObserver.SERVER_OP_PREFIX,
-				namespace,
-				qualifier,
-				serverOpName);
+		final String basePrefix = new StringBuilder(
+				ServerSideOperationsObserver.SERVER_OP_PREFIX)
+						.append(
+								".")
+						.append(
+								namespace)
+						.append(
+								".")
+						.append(
+								qualifier)
+						.append(
+								".")
+						.append(
+								serverOpName)
+						.append(
+								".")
+						.toString();
+
 		desc.setConfiguration(
-				String.format(
-						"%s%s",
-						basePrefix,
-						ServerSideOperationsObserver.SERVER_OP_CLASS_KEY),
+				basePrefix + ServerSideOperationsObserver.SERVER_OP_CLASS_KEY,
 				operationClass);
 		desc.setConfiguration(
-				String.format(
-						"%s%s",
-						basePrefix,
-						ServerSideOperationsObserver.SERVER_OP_PRIORITY_KEY),
+				basePrefix + ServerSideOperationsObserver.SERVER_OP_PRIORITY_KEY,
 				Integer.toString(
 						priority));
+
+		desc.setConfiguration(
+				basePrefix + ServerSideOperationsObserver.SERVER_OP_SCOPES_KEY,
+				scopes.stream().map(
+						ServerOpScope::name).collect(
+								Collectors.joining(
+										",")));
 		final String optionsPrefix = String.format(
-				"%s%s.",
-				basePrefix,
-				ServerSideOperationsObserver.SERVER_OP_OPTIONS_PREFIX);
+				basePrefix + ServerSideOperationsObserver.SERVER_OP_OPTIONS_PREFIX + ".");
 		for (final Entry<String, String> e : properties.entrySet()) {
 			desc.setConfiguration(
-					String.format(
-							"%s%s",
-							optionsPrefix,
-							e.getKey()),
+					optionsPrefix + e.getKey(),
 					e.getValue());
 		}
 	}
@@ -1584,6 +1501,7 @@ public class HBaseOperations implements
 					priority,
 					name,
 					operationClass,
+					configuredScopes,
 					properties);
 			conn.getAdmin().modifyTable(
 					table,
@@ -1629,6 +1547,7 @@ public class HBaseOperations implements
 					priority,
 					name,
 					operationClass,
+					newScopes,
 					properties);
 			conn.getAdmin().modifyTable(
 					table,

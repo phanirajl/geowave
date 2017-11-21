@@ -1,4 +1,4 @@
-package mil.nga.giat.geowave.datastore.hbase.coprocessors;
+package mil.nga.giat.geowave.datastore.hbase.server;
 
 import java.io.IOException;
 import java.util.List;
@@ -23,5 +23,6 @@ public interface HBaseServerOp
 			throws IOException;
 
 	public void init(
-			Map<String, String> options );
+			Map<String, String> options )
+			throws IOException;
 }
