@@ -1,6 +1,7 @@
 package mil.nga.giat.geowave.datastore.hbase.server;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,6 +15,7 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValue.Type;
+import org.apache.hadoop.hbase.client.Scan;
 
 import com.google.common.base.Function;
 import com.google.common.base.Splitter;
@@ -29,6 +31,7 @@ public class MergingServerOp implements
 		HBaseServerOp
 {
 	protected Set<ByteArrayId> adapterIds = new HashSet<>();
+	private static final String OLD_MAX_VERSIONS_KEY = "MAX_VERSIONS";
 
 	protected Mergeable getMergeable(
 			final Cell cell,
@@ -49,17 +52,28 @@ public class MergingServerOp implements
 			final List<Cell> rowCells )
 			throws IOException {
 		if (rowCells.size() > 1) {
+			System.err.println(
+					rowCells.size());
 			final Iterator<Cell> iter = rowCells.iterator();
 			final Map<ByteArrayId, List<Cell>> postIterationMerges = new HashMap<>();
 			// iterate once to capture individual tags/visibilities
 			boolean rebuildList = false;
 			while (iter.hasNext()) {
 				final Cell cell = iter.next();
+				// TODO consider avoiding extra byte array allocations
+				final byte[] familyBytes = CellUtil.cloneFamily(
+						cell);
 				if (adapterIds.contains(
 						new ByteArrayId(
-								cell.getFamilyArray()))) {
+								familyBytes))) {
+					final byte[] tagsBytes = new byte[cell.getTagsLength()];
+					// TODO consider avoiding extra byte array allocations
+					CellUtil.copyTagTo(
+							cell,
+							tagsBytes,
+							0);
 					final ByteArrayId tags = new ByteArrayId(
-							cell.getTagsArray());
+							tagsBytes);
 					List<Cell> cells = postIterationMerges.get(
 							tags);
 					if (cells == null) {
@@ -122,7 +136,6 @@ public class MergingServerOp implements
 		}
 		final byte[] valueBinary = getBinary(
 				currentMergeable);
-
 		// this is basically a lengthy verbose form of cloning
 		// in-place (without allocating new byte arrays) and
 		// simply replacing the value with the new mergeable
@@ -173,5 +186,20 @@ public class MergingServerOp implements
 										input);
 							}
 						}));
+	}
+
+	@Override
+	public void preScannerOpen(
+			final Scan scan ) {
+		scan.setAttribute(
+				OLD_MAX_VERSIONS_KEY,
+				ByteBuffer
+						.allocate(
+								4)
+						.putInt(
+								scan.getMaxVersions())
+						.array());
+		scan.setMaxVersions();
+
 	}
 }

@@ -7,6 +7,7 @@ import java.util.List;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.regionserver.InternalScanner;
 import org.apache.hadoop.hbase.regionserver.ScannerContext;
+import org.apache.hadoop.hbase.regionserver.ScannerContext.LimitScope;
 
 public class ServerOpInternalScannerWrapper implements
 		InternalScanner
@@ -37,15 +38,13 @@ public class ServerOpInternalScannerWrapper implements
 	public boolean next(
 			final List<Cell> rowCells )
 			throws IOException {
+		boolean retVal = delegate.next(
+				rowCells);
 		if (!internalNextRow(
 				rowCells)) {
 			return false;
 		}
-		if (delegate != null) {
-			return delegate.next(
-					rowCells);
-		}
-		return true;
+		return retVal;
 	}
 
 	@Override
@@ -53,24 +52,22 @@ public class ServerOpInternalScannerWrapper implements
 			final List<Cell> rowCells,
 			final ScannerContext scannerContext )
 			throws IOException {
+		boolean retVal = delegate.next(
+				rowCells,
+				scannerContext);
+		if (scannerContext.checkAnyLimitReached(LimitScope.BETWEEN_CELLS)){
 		if (!internalNextRow(
 				rowCells)) {
 			return false;
 		}
-		if (delegate != null) {
-			return delegate.next(
-					rowCells,
-					scannerContext);
 		}
-		return true;
+		return retVal;
 	}
 
 	@Override
 	public void close()
 			throws IOException {
-		if (delegate != null) {
-			delegate.close();
-		}
+		delegate.close();
 	}
 
 }

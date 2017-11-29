@@ -134,8 +134,8 @@ public class ServerSideOperationStore
 			// defer instantiation of the filter until its required
 			if (operation == null) {
 				operation = createOperation();
-				options = null;
 				className = null;
+				options = null;
 			}
 			return operation;
 		}

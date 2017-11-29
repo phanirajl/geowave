@@ -1,17 +1,18 @@
 package mil.nga.giat.geowave.datastore.hbase.server;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.client.Scan;
 
 public interface HBaseServerOp
 {
 	/**
 	 *
-	 * @param rowCells
-	 *            the cells of the current row
+	 * @param rowScanner
+	 *            the cells of the current row, as a scanner so that partial
+	 *            cell results within a whole row can be iterated on when a
+	 *            single row exceeds internal HBase limits
 	 * @return true to continue iteration - false will end the scan, resulting
 	 *         in no more subsequent rows (most situations should be true)
 	 *
@@ -19,8 +20,17 @@ public interface HBaseServerOp
 	 *             e if an exception occurs during iteration
 	 */
 	public boolean nextRow(
-			List<Cell> rowCells )
+			RowScanner rowScanner )
 			throws IOException;
+
+	/**
+	 * this is a callback giving an operation that works on scanner scope the
+	 * opportunity to effect the scan
+	 *
+	 * @param scan
+	 */
+	public void preScannerOpen(
+			Scan scan );
 
 	public void init(
 			Map<String, String> options )

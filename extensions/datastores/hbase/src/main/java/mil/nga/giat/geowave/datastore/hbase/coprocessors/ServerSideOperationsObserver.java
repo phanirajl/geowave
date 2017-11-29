@@ -17,10 +17,10 @@ import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.regionserver.InternalScanner;
-import org.apache.hadoop.hbase.regionserver.KeyValueScanner;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.regionserver.ScanType;
 import org.apache.hadoop.hbase.regionserver.Store;
+import org.apache.hadoop.hbase.regionserver.compactions.CompactionRequest;
 import org.apache.log4j.Logger;
 
 import com.google.common.collect.ImmutableSet;
@@ -84,60 +84,59 @@ public class ServerSideOperationsObserver extends
 	}
 
 	@Override
-	public InternalScanner preFlushScannerOpen(
-			final ObserverContext<RegionCoprocessorEnvironment> c,
+	public InternalScanner preFlush(
+			final ObserverContext<RegionCoprocessorEnvironment> e,
 			final Store store,
-			final KeyValueScanner memstoreScanner,
-			final InternalScanner s )
+			final InternalScanner scanner )
 			throws IOException {
 		if (opStore == null) {
-			return super.preFlushScannerOpen(
-					c,
+			return super.preFlush(
+					e,
 					store,
-					memstoreScanner,
-					s);
+					scanner);
 		}
-		return super.preFlushScannerOpen(
-				c,
+		System.err.println(
+				"flush");
+		return super.preFlush(
+				e,
 				store,
-				memstoreScanner,
 				wrapScannerWithOps(
-						c.getEnvironment().getRegionInfo().getTable(),
-						s,
+						e.getEnvironment().getRegionInfo().getTable(),
+						scanner,
 						ServerOpScope.MINOR_COMPACTION,
 						INTERNAL_SCANNER_FACTORY));
 	}
 
 	@Override
-	public InternalScanner preCompactScannerOpen(
-			final ObserverContext<RegionCoprocessorEnvironment> c,
+	public InternalScanner preCompact(
+			final ObserverContext<RegionCoprocessorEnvironment> e,
 			final Store store,
-			final List<? extends KeyValueScanner> scanners,
+			final InternalScanner scanner,
 			final ScanType scanType,
-			final long earliestPutTs,
-			final InternalScanner s )
+			final CompactionRequest request )
 			throws IOException {
+		System.err.println(
+				"pre compact");
 		if (opStore == null) {
-			return super.preCompactScannerOpen(
-					c,
+			return super.preCompact(
+					e,
 					store,
-					scanners,
+					scanner,
 					scanType,
-					earliestPutTs,
-					s);
+					request);
 		}
-
-		return super.preCompactScannerOpen(
-				c,
+		System.err.println(
+				"compact");
+		return super.preCompact(
+				e,
 				store,
-				scanners,
-				scanType,
-				earliestPutTs,
 				wrapScannerWithOps(
-						c.getEnvironment().getRegionInfo().getTable(),
-						s,
+						e.getEnvironment().getRegionInfo().getTable(),
+						scanner,
 						ServerOpScope.MAJOR_COMPACTION,
-						INTERNAL_SCANNER_FACTORY));
+						INTERNAL_SCANNER_FACTORY),
+				scanType,
+				request);
 	}
 
 	@Override
@@ -146,14 +145,44 @@ public class ServerSideOperationsObserver extends
 			final Scan scan,
 			final RegionScanner s )
 			throws IOException {
+		if (opStore != null) {
+			final TableName tableName = e.getEnvironment().getRegionInfo().getTable();
+			if (!tableName.isSystemTable()) {
+				final String namespace = tableName.getNamespaceAsString();
+				final String qualifier = tableName.getQualifierAsString();
+				final Collection<HBaseServerOp> serverOps = opStore.getOperations(
+						namespace,
+						qualifier,
+						ServerOpScope.SCAN);
+				for (final HBaseServerOp op : serverOps) {
+					op.preScannerOpen(
+							scan);
+				}
+			}
+		}
+		return super.preScannerOpen(
+				e,
+				scan,
+				s);
+	}
+
+	@Override
+	public RegionScanner postScannerOpen(
+			final ObserverContext<RegionCoprocessorEnvironment> e,
+			final Scan scan,
+			final RegionScanner s )
+			throws IOException {
+		System.err.println(
+				"pre scan");
 		if (opStore == null) {
-			return super.preScannerOpen(
+			return super.postScannerOpen(
 					e,
 					scan,
 					s);
 		}
-
-		return super.preScannerOpen(
+		System.err.println(
+				"post scan");
+		return super.postScannerOpen(
 				e,
 				scan,
 				wrapScannerWithOps(

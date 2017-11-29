@@ -24,69 +24,49 @@ public class ServerOpRegionScannerWrapper extends
 
 	@Override
 	public HRegionInfo getRegionInfo() {
-		if (delegate != null) {
-			return ((RegionScanner) delegate).getRegionInfo();
-		}
-		return null;
+		return ((RegionScanner) delegate).getRegionInfo();
 	}
 
 	@Override
 	public boolean isFilterDone()
 			throws IOException {
-		if (delegate != null) {
-			return ((RegionScanner) delegate).isFilterDone();
-		}
-		return false;
+		return ((RegionScanner) delegate).isFilterDone();
 	}
 
 	@Override
 	public boolean reseek(
 			final byte[] row )
 			throws IOException {
-		if (delegate != null) {
-			return ((RegionScanner) delegate).reseek(
-					row);
-		}
-		return false;
+		return ((RegionScanner) delegate).reseek(
+				row);
 	}
 
 	@Override
 	public long getMaxResultSize() {
-		if (delegate != null) {
-			return ((RegionScanner) delegate).getMaxResultSize();
-		}
-		return Long.MAX_VALUE;
+		return ((RegionScanner) delegate).getMaxResultSize();
 	}
 
 	@Override
 	public long getMvccReadPoint() {
-		if (delegate != null) {
-			return ((RegionScanner) delegate).getMvccReadPoint();
-		}
-		return 0;
+		return ((RegionScanner) delegate).getMvccReadPoint();
 	}
 
 	@Override
 	public int getBatch() {
-		if (delegate != null) {
-			return ((RegionScanner) delegate).getBatch();
-		}
-		return -1;
+		return ((RegionScanner) delegate).getBatch();
 	}
 
 	@Override
 	public boolean nextRaw(
 			final List<Cell> rowCells )
 			throws IOException {
+		final boolean retVal = ((RegionScanner) delegate).nextRaw(
+				rowCells);
 		if (!internalNextRow(
 				rowCells)) {
 			return false;
 		}
-		if (delegate != null) {
-			return ((RegionScanner) delegate).nextRaw(
-					rowCells);
-		}
-		return true;
+		return retVal;
 	}
 
 	@Override
@@ -94,15 +74,13 @@ public class ServerOpRegionScannerWrapper extends
 			final List<Cell> rowCells,
 			final ScannerContext scannerContext )
 			throws IOException {
+		final boolean retVal = ((RegionScanner) delegate).nextRaw(
+				rowCells,
+				scannerContext);
 		if (!internalNextRow(
 				rowCells)) {
 			return false;
 		}
-		if (delegate != null) {
-			return ((RegionScanner) delegate).nextRaw(
-					rowCells,
-					scannerContext);
-		}
-		return true;
+		return retVal;
 	}
 }

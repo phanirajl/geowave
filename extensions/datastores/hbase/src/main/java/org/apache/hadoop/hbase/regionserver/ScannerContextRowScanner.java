@@ -1,0 +1,56 @@
+package org.apache.hadoop.hbase.regionserver;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.regionserver.ScannerContext.LimitScope;
+
+import mil.nga.giat.geowave.datastore.hbase.server.RowScanner;
+
+/**
+ * this is required to be in org.apache.hadoop.hbase.regionserver because it
+ * accesses package private methods within ScannerContext
+ *
+ *
+ */
+public class ScannerContextRowScanner implements
+		RowScanner
+{
+	private final InternalScanner scanner;
+	private final ScannerContext scannerContext;
+	private final List<Cell> cells;
+	private boolean done = false;
+
+	public ScannerContextRowScanner(
+			final InternalScanner scanner,
+			final List<Cell> cells,
+			final ScannerContext scannerContext ) {
+		this.scanner = scanner;
+		this.cells = cells;
+		this.scannerContext = scannerContext;
+	}
+
+	@Override
+	public boolean isMidRow() {
+		if ((scannerContext == null) || done) {
+			return false;
+		}
+		return scannerContext.checkAnyLimitReached(
+				LimitScope.BETWEEN_CELLS);
+	}
+
+	@Override
+	public List<Cell> nextCellsInRow()
+			throws IOException {
+		if (done) {
+			return Collections.EMPTY_LIST;
+		}
+		done = !scanner.next(
+				cells,
+				scannerContext);
+		return cells;
+	}
+
+}

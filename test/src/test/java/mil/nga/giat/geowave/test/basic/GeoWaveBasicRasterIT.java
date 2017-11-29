@@ -93,7 +93,7 @@ public class GeoWaveBasicRasterIT extends
 		LOGGER.warn("-----------------------------------------");
 	}
 
-	@Test
+//	@Test
 	public void testNoDataMergeStrategy()
 			throws IOException {
 		final String coverageName = "testNoDataMergeStrategy";
@@ -789,7 +789,7 @@ public class GeoWaveBasicRasterIT extends
 						null);
 				final MergeCounter mergeCounter = thisTile.getMetadata();
 				// we're merging, this is the incremented new number of merges
-				final int newNumMerges = mergeCounter.getNumMerges() + 1;
+				final int newNumMerges = mergeCounter.getNumMerges() +  nextTile.getMetadata().getNumMerges() + 1;
 
 				// we've merged 1 more tile than the total number of merges (ie.
 				// if we've performed 1 merge, we've seen 2 tiles)
