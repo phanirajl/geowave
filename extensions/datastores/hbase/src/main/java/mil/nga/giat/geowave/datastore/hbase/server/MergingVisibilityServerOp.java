@@ -38,12 +38,17 @@ public class MergingVisibilityServerOp extends
 
 	@Override
 	public boolean nextRow(
-			final List<Cell> rowCells )
+			final RowScanner rowScanner )
 			throws IOException {
-		if (rowCells.size() > 1) {
-			mergeList(
-					rowCells);
+		final List<Cell> rowCells = rowScanner.currentCellsInRow();
+		do {
+			if (rowCells.size() > 1) {
+				mergeList(
+						rowCells);
+			}
 		}
+		while (!rowScanner.nextCellsInRow().isEmpty());
+
 		return true;
 	}
 

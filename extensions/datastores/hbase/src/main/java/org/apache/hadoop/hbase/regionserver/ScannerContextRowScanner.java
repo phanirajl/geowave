@@ -44,13 +44,23 @@ public class ScannerContextRowScanner implements
 	@Override
 	public List<Cell> nextCellsInRow()
 			throws IOException {
-		if (done) {
+		if (!isMidRow()) {
 			return Collections.EMPTY_LIST;
 		}
 		done = !scanner.next(
 				cells,
 				scannerContext);
 		return cells;
+	}
+
+	@Override
+	public List<Cell> currentCellsInRow() {
+		return cells;
+	}
+
+	@Override
+	public boolean isDone() {
+		return done;
 	}
 
 }

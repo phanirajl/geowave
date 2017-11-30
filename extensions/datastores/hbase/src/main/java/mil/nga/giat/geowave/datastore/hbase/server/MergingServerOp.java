@@ -8,7 +8,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.hadoop.hbase.Cell;
@@ -16,6 +15,7 @@ import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValue.Type;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.util.Bytes;
 
 import com.google.common.base.Function;
 import com.google.common.base.Splitter;
@@ -30,6 +30,7 @@ import mil.nga.giat.geowave.core.store.server.RowMergingAdapterOptionProvider;
 public class MergingServerOp implements
 		HBaseServerOp
 {
+
 	protected Set<ByteArrayId> adapterIds = new HashSet<>();
 	private static final String OLD_MAX_VERSIONS_KEY = "MAX_VERSIONS";
 
@@ -49,64 +50,78 @@ public class MergingServerOp implements
 
 	@Override
 	public boolean nextRow(
-			final List<Cell> rowCells )
+			final RowScanner rowScanner )
 			throws IOException {
-		if (rowCells.size() > 1) {
-			System.err.println(
-					rowCells.size());
-			final Iterator<Cell> iter = rowCells.iterator();
-			final Map<ByteArrayId, List<Cell>> postIterationMerges = new HashMap<>();
-			// iterate once to capture individual tags/visibilities
-			boolean rebuildList = false;
-			while (iter.hasNext()) {
-				final Cell cell = iter.next();
-				// TODO consider avoiding extra byte array allocations
-				final byte[] familyBytes = CellUtil.cloneFamily(
-						cell);
-				if (adapterIds.contains(
-						new ByteArrayId(
-								familyBytes))) {
-					final byte[] tagsBytes = new byte[cell.getTagsLength()];
+		final List<Cell> rowCells = rowScanner.currentCellsInRow();
+		do {
+			if (rowCells.size() > 1) {
+				System.err.println(
+						rowCells.size());
+				final Iterator<Cell> iter = rowCells.iterator();
+				final Map<PartialCellEquality, List<Cell>> postIterationMerges = new HashMap<>();
+				// iterate once to capture individual tags/visibilities
+				boolean rebuildList = false;
+				while (iter.hasNext()) {
+					final Cell cell = iter.next();
 					// TODO consider avoiding extra byte array allocations
-					CellUtil.copyTagTo(
-							cell,
-							tagsBytes,
-							0);
-					final ByteArrayId tags = new ByteArrayId(
-							tagsBytes);
-					List<Cell> cells = postIterationMerges.get(
-							tags);
-					if (cells == null) {
-						cells = new ArrayList<>();
-						postIterationMerges.put(
-								tags,
-								cells);
+					final byte[] familyBytes = CellUtil.cloneFamily(
+							cell);
+					final ByteArrayId adapterId = new ByteArrayId(
+							familyBytes);
+					if (adapterIds.contains(
+							adapterId)) {
+						final byte[] tagsBytes = new byte[cell.getTagsLength()];
+						// TODO consider avoiding extra byte array allocations
+						CellUtil.copyTagTo(
+								cell,
+								tagsBytes,
+								0);
+						final ByteArrayId tags = new ByteArrayId(
+								tagsBytes);
+						final AdapterAndTagPair key = new AdapterAndTagPair(
+								adapterId,
+								tags);
+						List<Cell> cells = postIterationMerges.get(
+								key);
+						if (cells == null) {
+							cells = new ArrayList<>();
+							postIterationMerges.put(
+									key,
+									cells);
+						}
+						else {
+							// this implies there is more than one cell with the
+							// same vis, so merging will need to take place
+							rebuildList = true;
+						}
+						cells.add(
+								cell);
 					}
 					else {
-						// this implies there is more than one cell with the
-						// same vis, so merging will need to take place
-						rebuildList = true;
+						// get max versions and trim these cells to max versions
+						// per column family and qualifier, and tags
+						CellUtil.ma
+						CellUtil.equals(a, b)cell.equals(cell);
 					}
-					cells.add(
-							cell);
 				}
-			}
-			if (rebuildList) {
-				rowCells.clear();
-				for (final Entry<ByteArrayId, List<Cell>> entry : postIterationMerges.entrySet()) {
-					if (entry.getValue().size() > 1) {
-						rowCells.add(
-								mergeList(
-										entry.getValue()));
-					}
-					else if (entry.getValue().size() == 1) {
-						rowCells.add(
-								entry.getValue().get(
-										0));
+				if (rebuildList) {
+					rowCells.clear();
+					for (final List<Cell> cells : postIterationMerges.values()) {
+						if (cells.size() > 1) {
+							rowCells.add(
+									mergeList(
+											cells));
+						}
+						else if (cells.size() == 1) {
+							rowCells.add(
+									cells.get(
+											0));
+						}
 					}
 				}
 			}
 		}
+		while (!rowScanner.nextCellsInRow().isEmpty());
 		return true;
 	}
 

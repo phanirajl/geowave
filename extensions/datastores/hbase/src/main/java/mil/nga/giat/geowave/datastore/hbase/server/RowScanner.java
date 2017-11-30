@@ -13,4 +13,6 @@ public interface RowScanner
 			throws IOException;
 	
 	public boolean isDone();
+	
+	public List<Cell> currentCellsInRow();
 }
