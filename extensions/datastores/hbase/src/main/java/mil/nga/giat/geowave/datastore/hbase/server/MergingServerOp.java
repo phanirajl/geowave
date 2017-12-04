@@ -78,8 +78,6 @@ public class MergingServerOp implements
 						maxVersions = (Integer) oldMaxObj;
 					}
 				}
-				System.err.println(
-						rowCells.size());
 				final Iterator<Cell> iter = rowCells.iterator();
 				final Map<PartialCellEquality, List<Cell>> merges = new HashMap<>();
 				final Map<PartialCellEquality, List<Cell>> nonMerges = new HashMap<>();

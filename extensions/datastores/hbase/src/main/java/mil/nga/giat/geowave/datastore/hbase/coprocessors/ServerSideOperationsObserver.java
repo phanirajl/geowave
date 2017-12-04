@@ -100,8 +100,6 @@ public class ServerSideOperationsObserver extends
 					store,
 					scanner);
 		}
-		System.err.println(
-				"flush");
 		return super.preFlush(
 				e,
 				store,
@@ -121,8 +119,6 @@ public class ServerSideOperationsObserver extends
 			final ScanType scanType,
 			final CompactionRequest request )
 			throws IOException {
-		System.err.println(
-				"pre compact");
 		if (opStore == null) {
 			return super.preCompact(
 					e,
@@ -131,8 +127,6 @@ public class ServerSideOperationsObserver extends
 					scanType,
 					request);
 		}
-		System.err.println(
-				"compact");
 		return super.preCompact(
 				e,
 				store,
@@ -179,16 +173,12 @@ public class ServerSideOperationsObserver extends
 			final Scan scan,
 			final RegionScanner s )
 			throws IOException {
-		System.err.println(
-				"pre scan");
 		if (opStore == null) {
 			return super.postScannerOpen(
 					e,
 					scan,
 					s);
 		}
-		System.err.println(
-				"post scan");
 		return super.postScannerOpen(
 				e,
 				scan,
