@@ -2,9 +2,12 @@ package org.apache.hadoop.hbase.regionserver;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.regionserver.ScannerContext.LimitScope;
 
 import mil.nga.giat.geowave.datastore.hbase.server.RowScanner;
@@ -22,14 +25,18 @@ public class ScannerContextRowScanner implements
 	private final ScannerContext scannerContext;
 	private final List<Cell> cells;
 	private boolean done = false;
+	private final Scan scan;
+	private Map<String,Object> hints;
 
 	public ScannerContextRowScanner(
 			final InternalScanner scanner,
 			final List<Cell> cells,
-			final ScannerContext scannerContext ) {
+			final ScannerContext scannerContext,
+			Scan scan) {
 		this.scanner = scanner;
 		this.cells = cells;
 		this.scannerContext = scannerContext;
+		this.scan = scan;
 	}
 
 	@Override
@@ -63,4 +70,17 @@ public class ScannerContextRowScanner implements
 		return done;
 	}
 
+	@Override
+	public Map<String, Object> getHints() {
+		if (hints == null) {
+			//this isn't threadsafe but shouldn't need to be
+			hints = new HashMap<>();
+		}
+		return hints;
+	}
+
+	@Override
+	public Scan getScan() {
+		return scan;
+	}
 }

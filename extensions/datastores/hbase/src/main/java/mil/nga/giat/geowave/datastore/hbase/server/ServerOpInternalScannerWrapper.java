@@ -5,40 +5,65 @@ import java.util.Collection;
 import java.util.List;
 
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.regionserver.InternalScanner;
 import org.apache.hadoop.hbase.regionserver.ScannerContext;
-import org.apache.hadoop.hbase.regionserver.ScannerContext.LimitScope;
+import org.apache.hadoop.hbase.regionserver.ScannerContextRowScanner;
 
 public class ServerOpInternalScannerWrapper implements
 		InternalScanner
 {
 	protected final Collection<HBaseServerOp> orderedServerOps;
 	protected InternalScanner delegate;
+	protected Scan scan;
 
 	public ServerOpInternalScannerWrapper(
 			final Collection<HBaseServerOp> orderedServerOps,
-			final InternalScanner delegate ) {
+			final InternalScanner delegate,
+			final Scan scan ) {
 		this.orderedServerOps = orderedServerOps;
 		this.delegate = delegate;
+		this.scan = scan;
+	}
+
+	protected boolean internalNextRow(
+			final RowScanner rowScanner )
+			throws IOException {
+		for (final HBaseServerOp serverOp : orderedServerOps) {
+			if (!serverOp.nextRow(
+					rowScanner)) {
+				return false;
+			}
+		}
+		return rowScanner.isDone();
 	}
 
 	protected boolean internalNextRow(
 			final List<Cell> rowCells )
 			throws IOException {
-		for (final HBaseServerOp serverOp : orderedServerOps) {
-			if (!serverOp.nextRow(
-					rowCells)) {
-				return false;
-			}
-		}
-		return true;
+		return internalNextRow(
+				new BasicRowScanner(
+						rowCells,
+						scan));
+	}
+
+	protected boolean internalNextRow(
+			final List<Cell> rowCells,
+			final ScannerContext scannerContext )
+			throws IOException {
+		return internalNextRow(
+				new ScannerContextRowScanner(
+						delegate,
+						rowCells,
+						scannerContext,
+						scan));
 	}
 
 	@Override
 	public boolean next(
 			final List<Cell> rowCells )
 			throws IOException {
-		boolean retVal = delegate.next(
+		final boolean retVal = delegate.next(
 				rowCells);
 		if (!internalNextRow(
 				rowCells)) {
@@ -52,14 +77,13 @@ public class ServerOpInternalScannerWrapper implements
 			final List<Cell> rowCells,
 			final ScannerContext scannerContext )
 			throws IOException {
-		boolean retVal = delegate.next(
+		final boolean retVal = delegate.next(
 				rowCells,
 				scannerContext);
-		if (scannerContext.checkAnyLimitReached(LimitScope.BETWEEN_CELLS)){
 		if (!internalNextRow(
-				rowCells)) {
+				rowCells,
+				scannerContext)) {
 			return false;
-		}
 		}
 		return retVal;
 	}

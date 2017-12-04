@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.regionserver.ScannerContext;
 
@@ -13,13 +14,14 @@ public class ServerOpRegionScannerWrapper extends
 		ServerOpInternalScannerWrapper implements
 		RegionScanner
 {
-
 	public ServerOpRegionScannerWrapper(
 			final Collection<HBaseServerOp> orderedServerOps,
-			final RegionScanner delegate ) {
+			final RegionScanner delegate,
+			final Scan scan ) {
 		super(
 				orderedServerOps,
-				delegate);
+				delegate,
+				scan);
 	}
 
 	@Override
@@ -78,7 +80,8 @@ public class ServerOpRegionScannerWrapper extends
 				rowCells,
 				scannerContext);
 		if (!internalNextRow(
-				rowCells)) {
+				rowCells,
+				scannerContext)) {
 			return false;
 		}
 		return retVal;

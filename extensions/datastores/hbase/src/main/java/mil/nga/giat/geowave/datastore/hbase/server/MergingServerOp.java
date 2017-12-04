@@ -15,7 +15,6 @@ import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValue.Type;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.util.Bytes;
 
 import com.google.common.base.Function;
 import com.google.common.base.Splitter;
@@ -55,10 +54,35 @@ public class MergingServerOp implements
 		final List<Cell> rowCells = rowScanner.currentCellsInRow();
 		do {
 			if (rowCells.size() > 1) {
+				Integer maxVersions = null;
+				if (rowScanner.getScan() != null) {
+					final Object oldMaxObj = rowScanner.getHints().get(
+							OLD_MAX_VERSIONS_KEY);
+					if ((oldMaxObj == null) || !(oldMaxObj instanceof Integer)) {
+						final byte[] oldMaxVersions = rowScanner.getScan().getAttribute(
+								OLD_MAX_VERSIONS_KEY);
+						if (oldMaxVersions != null) {
+							maxVersions = ByteBuffer
+									.wrap(
+											oldMaxVersions)
+									.getInt();
+							// cache it in a "hints" map to avoid multiple byte
+							// buffer
+							// allocations
+							rowScanner.getHints().put(
+									OLD_MAX_VERSIONS_KEY,
+									maxVersions);
+						}
+					}
+					else {
+						maxVersions = (Integer) oldMaxObj;
+					}
+				}
 				System.err.println(
 						rowCells.size());
 				final Iterator<Cell> iter = rowCells.iterator();
-				final Map<PartialCellEquality, List<Cell>> postIterationMerges = new HashMap<>();
+				final Map<PartialCellEquality, List<Cell>> merges = new HashMap<>();
+				final Map<PartialCellEquality, List<Cell>> nonMerges = new HashMap<>();
 				// iterate once to capture individual tags/visibilities
 				boolean rebuildList = false;
 				while (iter.hasNext()) {
@@ -70,22 +94,14 @@ public class MergingServerOp implements
 							familyBytes);
 					if (adapterIds.contains(
 							adapterId)) {
-						final byte[] tagsBytes = new byte[cell.getTagsLength()];
-						// TODO consider avoiding extra byte array allocations
-						CellUtil.copyTagTo(
+						final PartialCellEquality key = new PartialCellEquality(
 								cell,
-								tagsBytes,
-								0);
-						final ByteArrayId tags = new ByteArrayId(
-								tagsBytes);
-						final AdapterAndTagPair key = new AdapterAndTagPair(
-								adapterId,
-								tags);
-						List<Cell> cells = postIterationMerges.get(
+								includeTags());
+						List<Cell> cells = merges.get(
 								key);
 						if (cells == null) {
 							cells = new ArrayList<>();
-							postIterationMerges.put(
+							merges.put(
 									key,
 									cells);
 						}
@@ -98,15 +114,31 @@ public class MergingServerOp implements
 								cell);
 					}
 					else {
+						// always include tags for non-merge cells so that
+						// versioning works as expected
+						final PartialCellEquality key = new PartialCellEquality(
+								cell,
+								true);
 						// get max versions and trim these cells to max versions
 						// per column family and qualifier, and tags
-						CellUtil.ma
-						CellUtil.equals(a, b)cell.equals(cell);
+						List<Cell> cells = nonMerges.get(
+								key);
+						if (cells == null) {
+							cells = new ArrayList<>();
+							nonMerges.put(
+									key,
+									cells);
+						}
+						else if ((maxVersions != null) && (cells.size() >= maxVersions)) {
+							rebuildList = true;
+						}
+						cells.add(
+								cell);
 					}
 				}
 				if (rebuildList) {
 					rowCells.clear();
-					for (final List<Cell> cells : postIterationMerges.values()) {
+					for (final List<Cell> cells : merges.values()) {
 						if (cells.size() > 1) {
 							rowCells.add(
 									mergeList(
@@ -118,10 +150,26 @@ public class MergingServerOp implements
 											0));
 						}
 					}
+					for (final List<Cell> cells : nonMerges.values()) {
+						if ((maxVersions != null) && (cells.size() > maxVersions)) {
+							rowCells.addAll(
+									cells.subList(
+											0,
+											maxVersions));
+						}
+						else {
+							rowCells.addAll(
+									cells);
+						}
+					}
 				}
 			}
 		}
 		while (!rowScanner.nextCellsInRow().isEmpty());
+		return true;
+	}
+
+	protected boolean includeTags() {
 		return true;
 	}
 
@@ -189,8 +237,10 @@ public class MergingServerOp implements
 		}
 		adapterIds = Sets.newHashSet(
 				Iterables.transform(
-						Splitter.on(
-								",").split(
+						Splitter
+								.on(
+										",")
+								.split(
 										adapterIdsStr),
 						new Function<String, ByteArrayId>() {
 
@@ -206,14 +256,18 @@ public class MergingServerOp implements
 	@Override
 	public void preScannerOpen(
 			final Scan scan ) {
-		scan.setAttribute(
-				OLD_MAX_VERSIONS_KEY,
-				ByteBuffer
-						.allocate(
-								4)
-						.putInt(
-								scan.getMaxVersions())
-						.array());
+		final int maxVersions = scan.getMaxVersions();
+		if ((maxVersions > 0) && (maxVersions < Integer.MAX_VALUE)) {
+			scan.setAttribute(
+					OLD_MAX_VERSIONS_KEY,
+					ByteBuffer
+							.allocate(
+									4)
+							.putInt(
+									maxVersions)
+							.array());
+
+		}
 		scan.setMaxVersions();
 
 	}

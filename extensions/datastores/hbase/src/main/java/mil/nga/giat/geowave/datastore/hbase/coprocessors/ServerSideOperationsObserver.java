@@ -52,7 +52,8 @@ public class ServerSideOperationsObserver extends
 	{
 		public T createScannerWrapper(
 				Collection<HBaseServerOp> orderedServerOps,
-				T delegate );
+				T delegate,
+				Scan scan );
 	}
 
 	private static class RegionScannerWrapperFactory implements
@@ -62,10 +63,12 @@ public class ServerSideOperationsObserver extends
 		@Override
 		public RegionScanner createScannerWrapper(
 				final Collection<HBaseServerOp> orderedServerOps,
-				final RegionScanner delegate ) {
+				final RegionScanner delegate,
+				final Scan scan ) {
 			return new ServerOpRegionScannerWrapper(
 					orderedServerOps,
-					delegate);
+					delegate,
+					scan);
 		}
 	}
 
@@ -76,10 +79,12 @@ public class ServerSideOperationsObserver extends
 		@Override
 		public InternalScanner createScannerWrapper(
 				final Collection<HBaseServerOp> orderedServerOps,
-				final InternalScanner delegate ) {
+				final InternalScanner delegate,
+				final Scan scan ) {
 			return new ServerOpInternalScannerWrapper(
 					orderedServerOps,
-					delegate);
+					delegate,
+					scan);
 		}
 	}
 
@@ -103,6 +108,7 @@ public class ServerSideOperationsObserver extends
 				wrapScannerWithOps(
 						e.getEnvironment().getRegionInfo().getTable(),
 						scanner,
+						null,
 						ServerOpScope.MINOR_COMPACTION,
 						INTERNAL_SCANNER_FACTORY));
 	}
@@ -133,6 +139,7 @@ public class ServerSideOperationsObserver extends
 				wrapScannerWithOps(
 						e.getEnvironment().getRegionInfo().getTable(),
 						scanner,
+						null,
 						ServerOpScope.MAJOR_COMPACTION,
 						INTERNAL_SCANNER_FACTORY),
 				scanType,
@@ -188,6 +195,7 @@ public class ServerSideOperationsObserver extends
 				wrapScannerWithOps(
 						e.getEnvironment().getRegionInfo().getTable(),
 						s,
+						scan,
 						ServerOpScope.SCAN,
 						REGION_SCANNER_FACTORY));
 	}
@@ -195,6 +203,7 @@ public class ServerSideOperationsObserver extends
 	public <T extends InternalScanner> T wrapScannerWithOps(
 			final TableName tableName,
 			final T scanner,
+			final Scan scan,
 			final ServerOpScope scope,
 			final ScannerWrapperFactory<T> factory ) {
 		if (!tableName.isSystemTable()) {
@@ -207,7 +216,8 @@ public class ServerSideOperationsObserver extends
 			if (!orderedServerOps.isEmpty()) {
 				return factory.createScannerWrapper(
 						orderedServerOps,
-						scanner);
+						scanner,
+						scan);
 			}
 		}
 		return scanner;
@@ -241,9 +251,11 @@ public class ServerSideOperationsObserver extends
 								optionKeys);
 					}
 					if (key.length() > (uniqueOp.length() + 1 + SERVER_OP_OPTIONS_PREFIX_LENGTH)) {
-						if (key.substring(
-								uniqueOp.length(),
-								uniqueOp.length() + SERVER_OP_OPTIONS_PREFIX_LENGTH).equals(
+						if (key
+								.substring(
+										uniqueOp.length(),
+										uniqueOp.length() + SERVER_OP_OPTIONS_PREFIX_LENGTH)
+								.equals(
 										SERVER_OP_OPTIONS_PREFIX)) {
 							optionKeys.add(
 									key.substring(
