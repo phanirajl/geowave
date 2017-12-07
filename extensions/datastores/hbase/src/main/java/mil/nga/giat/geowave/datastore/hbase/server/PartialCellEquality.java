@@ -2,6 +2,7 @@ package mil.nga.giat.geowave.datastore.hbase.server;
 
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellComparator;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 
 public class PartialCellEquality
@@ -18,6 +19,10 @@ public class PartialCellEquality
 
 	@Override
 	public int hashCode() {
+		final int rowHash = Bytes.hashCode(CellUtil.cloneRow(cell));
+//				cell.getRowArray(),
+//				cell.getRowOffset(),
+//				cell.getRowLength());
 		final int familyHash = Bytes.hashCode(
 				cell.getFamilyArray(),
 				cell.getFamilyOffset(),
@@ -28,7 +33,8 @@ public class PartialCellEquality
 				cell.getQualifierLength());
 
 		// combine the 6 sub-hashes
-		final int hash = (31 * familyHash) + qualifierHash;
+		int hash = (31 * familyHash) + qualifierHash;
+		hash = (31*hash) + rowHash; 
 		if (!includeTags) {
 			return hash;
 		}
@@ -52,8 +58,9 @@ public class PartialCellEquality
 			return false;
 		}
 		final PartialCellEquality other = (PartialCellEquality) obj;
-
-		return CellComparator.equalsFamily(
+		return CellComparator.equalsRow(
+				cell,
+				other.cell) && Bytes.equals(CellUtil.cloneRow(cell), CellUtil.cloneRow(other.cell))&& CellComparator.equalsFamily(
 				cell,
 				other.cell)
 				&& CellComparator.equalsQualifier(

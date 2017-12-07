@@ -255,7 +255,7 @@ public class LandsatIT extends
 						result).getAsBufferedImage(),
 				reference,
 				0,
-				0.005);
+				0.05);
 		MapProjection.SKIP_SANITY_CHECKS = false;
 	}
 }

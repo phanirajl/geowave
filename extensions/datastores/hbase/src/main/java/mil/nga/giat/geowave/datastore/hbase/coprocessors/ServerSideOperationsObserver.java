@@ -100,6 +100,8 @@ public class ServerSideOperationsObserver extends
 					store,
 					scanner);
 		}
+		System.err.println(
+				"flush");
 		return super.preFlush(
 				e,
 				store,
@@ -127,6 +129,8 @@ public class ServerSideOperationsObserver extends
 					scanType,
 					request);
 		}
+		System.err.println(
+				"compact");
 		return super.preCompact(
 				e,
 				store,
@@ -179,6 +183,8 @@ public class ServerSideOperationsObserver extends
 					scan,
 					s);
 		}
+		System.err.println(
+				"post scan");
 		return super.postScannerOpen(
 				e,
 				scan,

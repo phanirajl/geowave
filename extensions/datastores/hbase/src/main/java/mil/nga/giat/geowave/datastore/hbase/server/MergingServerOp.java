@@ -3,6 +3,7 @@ package mil.nga.giat.geowave.datastore.hbase.server;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -29,7 +30,7 @@ import mil.nga.giat.geowave.core.store.server.RowMergingAdapterOptionProvider;
 public class MergingServerOp implements
 		HBaseServerOp
 {
-
+	public static Object MUTEX = new Object();
 	protected Set<ByteArrayId> adapterIds = new HashSet<>();
 	private static final String OLD_MAX_VERSIONS_KEY = "MAX_VERSIONS";
 
@@ -51,120 +52,129 @@ public class MergingServerOp implements
 	public boolean nextRow(
 			final RowScanner rowScanner )
 			throws IOException {
-		final List<Cell> rowCells = rowScanner.currentCellsInRow();
-		do {
-			if (rowCells.size() > 1) {
-				Integer maxVersions = null;
-				if (rowScanner.getScan() != null) {
-					final Object oldMaxObj = rowScanner.getHints().get(
-							OLD_MAX_VERSIONS_KEY);
-					if ((oldMaxObj == null) || !(oldMaxObj instanceof Integer)) {
-						final byte[] oldMaxVersions = rowScanner.getScan().getAttribute(
+		synchronized (MUTEX) {
+			final List<Cell> rowCells = rowScanner.currentCellsInRow();
+			do {
+				if (rowCells.size() > 1) {
+					Integer maxVersions = null;
+					if (rowScanner.getScan() != null) {
+						final Object oldMaxObj = rowScanner.getHints().get(
 								OLD_MAX_VERSIONS_KEY);
-						if (oldMaxVersions != null) {
-							maxVersions = ByteBuffer
-									.wrap(
-											oldMaxVersions)
-									.getInt();
-							// cache it in a "hints" map to avoid multiple byte
-							// buffer
-							// allocations
-							rowScanner.getHints().put(
-									OLD_MAX_VERSIONS_KEY,
-									maxVersions);
-						}
-					}
-					else {
-						maxVersions = (Integer) oldMaxObj;
-					}
-				}
-				final Iterator<Cell> iter = rowCells.iterator();
-				final Map<PartialCellEquality, List<Cell>> merges = new HashMap<>();
-				final Map<PartialCellEquality, List<Cell>> nonMerges = new HashMap<>();
-				// iterate once to capture individual tags/visibilities
-				boolean rebuildList = false;
-				while (iter.hasNext()) {
-					final Cell cell = iter.next();
-					// TODO consider avoiding extra byte array allocations
-					final byte[] familyBytes = CellUtil.cloneFamily(
-							cell);
-					final ByteArrayId adapterId = new ByteArrayId(
-							familyBytes);
-					if (adapterIds.contains(
-							adapterId)) {
-						final PartialCellEquality key = new PartialCellEquality(
-								cell,
-								includeTags());
-						List<Cell> cells = merges.get(
-								key);
-						if (cells == null) {
-							cells = new ArrayList<>();
-							merges.put(
-									key,
-									cells);
+						if ((oldMaxObj == null) || !(oldMaxObj instanceof Integer)) {
+							final byte[] oldMaxVersions = rowScanner.getScan().getAttribute(
+									OLD_MAX_VERSIONS_KEY);
+							if (oldMaxVersions != null) {
+								maxVersions = ByteBuffer.wrap(
+										oldMaxVersions).getInt();
+								// cache it in a "hints" map to avoid multiple
+								// byte
+								// buffer
+								// allocations
+								rowScanner.getHints().put(
+										OLD_MAX_VERSIONS_KEY,
+										maxVersions);
+							}
 						}
 						else {
-							// this implies there is more than one cell with the
-							// same vis, so merging will need to take place
-							rebuildList = true;
+							maxVersions = (Integer) oldMaxObj;
 						}
-						cells.add(
+					}
+					System.err.println(
+							"overall " + rowCells.size());
+					final Iterator<Cell> iter = rowCells.iterator();
+					final Map<PartialCellEquality, List<Cell>> merges = new HashMap<>();
+					final Map<PartialCellEquality, List<Cell>> nonMerges = new HashMap<>();
+					// iterate once to capture individual tags/visibilities
+					boolean rebuildList = false;
+					while (iter.hasNext()) {
+						final Cell cell = iter.next();
+						System.err.println(
+								new ByteArrayId(
+										CellUtil.cloneRow(
+												cell)).getHexString());
+						// TODO consider avoiding extra byte array allocations
+						final byte[] familyBytes = CellUtil.cloneFamily(
 								cell);
-					}
-					else {
-						// always include tags for non-merge cells so that
-						// versioning works as expected
-						final PartialCellEquality key = new PartialCellEquality(
-								cell,
-								true);
-						// get max versions and trim these cells to max versions
-						// per column family and qualifier, and tags
-						List<Cell> cells = nonMerges.get(
-								key);
-						if (cells == null) {
-							cells = new ArrayList<>();
-							nonMerges.put(
-									key,
-									cells);
-						}
-						else if ((maxVersions != null) && (cells.size() >= maxVersions)) {
-							rebuildList = true;
-						}
-						cells.add(
-								cell);
-					}
-				}
-				if (rebuildList) {
-					rowCells.clear();
-					for (final List<Cell> cells : merges.values()) {
-						if (cells.size() > 1) {
-							rowCells.add(
-									mergeList(
-											cells));
-						}
-						else if (cells.size() == 1) {
-							rowCells.add(
-									cells.get(
-											0));
-						}
-					}
-					for (final List<Cell> cells : nonMerges.values()) {
-						if ((maxVersions != null) && (cells.size() > maxVersions)) {
-							rowCells.addAll(
-									cells.subList(
-											0,
-											maxVersions));
+						final ByteArrayId adapterId = new ByteArrayId(
+								familyBytes);
+						if (adapterIds.contains(
+								adapterId)) {
+							final PartialCellEquality key = new PartialCellEquality(
+									cell,
+									includeTags());
+							List<Cell> cells = merges.get(
+									key);
+							if (cells == null) {
+								cells = new ArrayList<>();
+								merges.put(
+										key,
+										cells);
+							}
+							else {
+								// this implies there is more than one cell with
+								// the
+								// same vis, so merging will need to take place
+								rebuildList = true;
+							}
+							cells.add(
+									cell);
 						}
 						else {
-							rowCells.addAll(
-									cells);
+							// always include tags for non-merge cells so that
+							// versioning works as expected
+							final PartialCellEquality key = new PartialCellEquality(
+									cell,
+									true);
+							// get max versions and trim these cells to max
+							// versions
+							// per column family and qualifier, and tags
+							List<Cell> cells = nonMerges.get(
+									key);
+							if (cells == null) {
+								cells = new ArrayList<>();
+								nonMerges.put(
+										key,
+										cells);
+							}
+							else if ((maxVersions != null) && (cells.size() >= maxVersions)) {
+								rebuildList = true;
+							}
+							cells.add(
+									cell);
+						}
+					}
+					if (rebuildList) {
+						rowCells.clear();
+						for (final List<Cell> cells : merges.values()) {
+							if (cells.size() > 1) {
+								rowCells.add(
+										mergeList(
+												cells));
+							}
+							else if (cells.size() == 1) {
+								rowCells.add(
+										cells.get(
+												0));
+							}
+						}
+						for (final List<Cell> cells : nonMerges.values()) {
+							if ((maxVersions != null) && (cells.size() > maxVersions)) {
+								rowCells.addAll(
+										cells.subList(
+												0,
+												maxVersions));
+							}
+							else {
+								rowCells.addAll(
+										cells);
+							}
 						}
 					}
 				}
 			}
+			while (!rowScanner.nextCellsInRow().isEmpty());
+			return true;
 		}
-		while (!rowScanner.nextCellsInRow().isEmpty());
-		return true;
 	}
 
 	protected boolean includeTags() {
@@ -173,53 +183,61 @@ public class MergingServerOp implements
 
 	protected Cell mergeList(
 			final List<Cell> cells ) {
-		Mergeable currentMergeable = null;
-		final Cell firstCell = cells.get(
-				0);
-		for (final Cell cell : cells) {
-			final Mergeable mergeable = getMergeable(
-					cell,
-					// TODO consider avoiding extra byte array
-					// allocations (which would require
-					// persistence utils to be able to use
-					// bytebuffer instead of byte[])
-					CellUtil.cloneValue(
-							cell));
-			if (mergeable != null) {
-				if (currentMergeable == null) {
-					currentMergeable = mergeable;
-				}
-				else {
-					currentMergeable.merge(
-							mergeable);
+		synchronized (MUTEX) {
+			System.err.println(
+					"merging " + cells.size());
+			Mergeable currentMergeable = null;
+			final Cell firstCell = cells.get(
+					0);
+			for (final Cell cell : cells) {
+				System.err.println(
+						new ByteArrayId(
+								CellUtil.cloneRow(
+										cell)).getHexString());
+				final Mergeable mergeable = getMergeable(
+						cell,
+						// TODO consider avoiding extra byte array
+						// allocations (which would require
+						// persistence utils to be able to use
+						// bytebuffer instead of byte[])
+						CellUtil.cloneValue(
+								cell));
+				if (mergeable != null) {
+					if (currentMergeable == null) {
+						currentMergeable = mergeable;
+					}
+					else {
+						currentMergeable.merge(
+								mergeable);
+					}
 				}
 			}
+			final byte[] valueBinary = getBinary(
+					currentMergeable);
+			// this is basically a lengthy verbose form of cloning
+			// in-place (without allocating new byte arrays) and
+			// simply replacing the value with the new mergeable
+			// value
+			return new KeyValue(
+					firstCell.getRowArray(),
+					firstCell.getRowOffset(),
+					firstCell.getRowLength(),
+					firstCell.getFamilyArray(),
+					firstCell.getFamilyOffset(),
+					firstCell.getFamilyLength(),
+					firstCell.getQualifierArray(),
+					firstCell.getQualifierOffset(),
+					firstCell.getQualifierLength(),
+					firstCell.getTimestamp(),
+					Type.codeToType(
+							firstCell.getTypeByte()),
+					valueBinary,
+					0,
+					valueBinary.length,
+					firstCell.getTagsArray(),
+					firstCell.getTagsOffset(),
+					firstCell.getTagsLength());
 		}
-		final byte[] valueBinary = getBinary(
-				currentMergeable);
-		// this is basically a lengthy verbose form of cloning
-		// in-place (without allocating new byte arrays) and
-		// simply replacing the value with the new mergeable
-		// value
-		return new KeyValue(
-				firstCell.getRowArray(),
-				firstCell.getRowOffset(),
-				firstCell.getRowLength(),
-				firstCell.getFamilyArray(),
-				firstCell.getFamilyOffset(),
-				firstCell.getFamilyLength(),
-				firstCell.getQualifierArray(),
-				firstCell.getQualifierOffset(),
-				firstCell.getQualifierLength(),
-				firstCell.getTimestamp(),
-				Type.codeToType(
-						firstCell.getTypeByte()),
-				valueBinary,
-				0,
-				valueBinary.length,
-				firstCell.getTagsArray(),
-				firstCell.getTagsOffset(),
-				firstCell.getTagsLength());
 	}
 
 	@Override
@@ -235,10 +253,8 @@ public class MergingServerOp implements
 		}
 		adapterIds = Sets.newHashSet(
 				Iterables.transform(
-						Splitter
-								.on(
-										",")
-								.split(
+						Splitter.on(
+								",").split(
 										adapterIdsStr),
 						new Function<String, ByteArrayId>() {
 
@@ -267,6 +283,5 @@ public class MergingServerOp implements
 
 		}
 		scan.setMaxVersions();
-
 	}
 }

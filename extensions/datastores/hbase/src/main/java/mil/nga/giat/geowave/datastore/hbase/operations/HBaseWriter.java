@@ -114,7 +114,7 @@ public class HBaseWriter implements
 			// retain multiple versions)
 			final Put put = new Put(
 					rowBytes,
-					System.currentTimeMillis());
+					System.nanoTime());
 
 			put.addColumn(
 					row.getAdapterId(),

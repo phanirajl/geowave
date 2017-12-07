@@ -162,8 +162,9 @@ public class ServerOpHelper
 			updateServerOps(
 					operations,
 					tableName,
-					rowMergingCombinerConfig,
-					rowMergingVisibilityCombinerConfig);
+					rowMergingCombinerConfig);
+//			,
+//					rowMergingVisibilityCombinerConfig);
 		}
 	}
 

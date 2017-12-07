@@ -134,14 +134,11 @@ public class ServerSideOperationStore
 			// defer instantiation of the filter until its required
 			if (operation == null) {
 				operation = createOperation();
-				className = null;
-				options = null;
 			}
 			return operation;
 		}
 
-		private synchronized HBaseServerOp createOperation() {
-			// dereference classname and options as they are no longer needed
+		private HBaseServerOp createOperation() {
 			final HBaseServerOp op = PersistenceUtils.classFactory(
 					className,
 					HBaseServerOp.class);

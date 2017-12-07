@@ -661,86 +661,93 @@ public class HBaseOperations implements
 			final AdapterStore adapterStore,
 			final AdapterIndexMappingStore adapterIndexMappingStore ) {
 		// loop through all adapters and find row merging adapters
-		final Map<ByteArrayId, RowMergingDataAdapter> map = new HashMap<>();
-		final List<String> columnFamilies = new ArrayList<>();
-		try (CloseableIterator<DataAdapter<?>> it = adapterStore.getAdapters()) {
-			while (it.hasNext()) {
-				final DataAdapter a = it.next();
-				if (a instanceof RowMergingDataAdapter) {
-					if (adapterIndexMappingStore.getIndicesForAdapter(
-							a.getAdapterId()).contains(
-									index.getId())) {
-						map.put(
-								a.getAdapterId(),
-								(RowMergingDataAdapter) a);
-						columnFamilies.add(
-								a.getAdapterId().getString());
-					}
-				}
-			}
+//		final Map<ByteArrayId, RowMergingDataAdapter> map = new HashMap<>();
+//		final List<String> columnFamilies = new ArrayList<>();
+//		try (CloseableIterator<DataAdapter<?>> it = adapterStore.getAdapters()) {
+//			while (it.hasNext()) {
+//				final DataAdapter a = it.next();
+//				if (a instanceof RowMergingDataAdapter) {
+//					if (adapterIndexMappingStore.getIndicesForAdapter(
+//							a.getAdapterId()).contains(
+//									index.getId())) {
+//						map.put(
+//								a.getAdapterId(),
+//								(RowMergingDataAdapter) a);
+//						columnFamilies.add(
+//								a.getAdapterId().getString());
+//					}
+//				}
+//			}
+//		}
+//		catch (final IOException e) {
+//			LOGGER.error(
+//					"Cannot lookup data adapters",
+//					e);
+//			return false;
+//		}
+//		if (columnFamilies.isEmpty()) {
+//			LOGGER.warn(
+//					"There is no mergeable data found in datastore");
+//			return false;
+//		}
+//		final String table = index.getId().getString();
+//		try (HBaseWriter writer = createWriter(
+//				index.getId().getString(),
+//				columnFamilies.toArray(
+//						new String[] {}),
+//				false)) {
+//			final Scan scanner = new Scan();
+//			for (final String cf : columnFamilies) {
+//				scanner.addFamily(
+//						new ByteArrayId(
+//								cf).getBytes());
+//			}
+//			final ResultScanner rs = getScannedResults(
+//					scanner,
+//					table);
+//
+//			// Get a GeoWaveRow iterator from ResultScanner
+//			final Iterator<GeoWaveRow> it = new CloseableIteratorWrapper<>(
+//					new ScannerClosableWrapper(
+//							rs),
+//					Iterators.transform(
+//							rs.iterator(),
+//							new com.google.common.base.Function<Result, GeoWaveRow>() {
+//								@Override
+//								public GeoWaveRow apply(
+//										final Result result ) {
+//									return new HBaseRow(
+//											result,
+//											index.getIndexStrategy().getPartitionKeyLength());
+//								}
+//
+//							}));
+//
+//			final MergingEntryIterator iterator = new MergingEntryIterator<>(
+//					adapterStore,
+//					index,
+//					it,
+//					null,
+//					null,
+//					map);
+//			while (iterator.hasNext()) {
+//				iterator.next();
+//			}
+		try {
+			conn.getAdmin().compact(getTableName(index.getId().getString()));
 		}
-		catch (final IOException e) {
-			LOGGER.error(
-					"Cannot lookup data adapters",
-					e);
-			return false;
+		catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
-		if (columnFamilies.isEmpty()) {
-			LOGGER.warn(
-					"There is no mergeable data found in datastore");
-			return false;
-		}
-		final String table = index.getId().getString();
-		try (HBaseWriter writer = createWriter(
-				index.getId().getString(),
-				columnFamilies.toArray(
-						new String[] {}),
-				false)) {
-			final Scan scanner = new Scan();
-			for (final String cf : columnFamilies) {
-				scanner.addFamily(
-						new ByteArrayId(
-								cf).getBytes());
-			}
-			final ResultScanner rs = getScannedResults(
-					scanner,
-					table);
-
-			// Get a GeoWaveRow iterator from ResultScanner
-			final Iterator<GeoWaveRow> it = new CloseableIteratorWrapper<>(
-					new ScannerClosableWrapper(
-							rs),
-					Iterators.transform(
-							rs.iterator(),
-							new com.google.common.base.Function<Result, GeoWaveRow>() {
-								@Override
-								public GeoWaveRow apply(
-										final Result result ) {
-									return new HBaseRow(
-											result,
-											index.getIndexStrategy().getPartitionKeyLength());
-								}
-
-							}));
-
-			final MergingEntryIterator iterator = new MergingEntryIterator<>(
-					adapterStore,
-					index,
-					it,
-					null,
-					null,
-					map);
-			while (iterator.hasNext()) {
-				iterator.next();
-			}
 			return true;
-		}
-		catch (final IOException e) {
-			LOGGER.error(
-					"Cannot create writer for table '" + index.getId().getString() + "'",
-					e);
-		}
-		return false;
+//		}
+//		catch (final IOException e) {
+//			LOGGER.error(
+//					"Cannot create writer for table '" + index.getId().getString() + "'",
+//					e);
+//		}
+//		return false;
 	}
 
 	public void insurePartition(

@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2013-2017 Contributors to the Eclipse Foundation
- * 
+ *
  * See the NOTICE file distributed with this work for additional
  * information regarding copyright ownership.
  * All rights reserved. This program and the accompanying materials
@@ -17,13 +17,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.opengis.coverage.grid.GridCoverage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.GeometryFactory;
@@ -64,9 +64,11 @@ public class GeoWaveBasicRasterIT extends
 	})
 	protected DataStorePluginOptions dataStoreOptions;
 
-	private final static Logger LOGGER = LoggerFactory.getLogger(GeoWaveBasicRasterIT.class);
+	private final static Logger LOGGER = LoggerFactory.getLogger(
+			GeoWaveBasicRasterIT.class);
 	private static long startMillis;
 
+	@Override
 	protected DataStorePluginOptions getDataStorePluginOptions() {
 		return dataStoreOptions;
 	}
@@ -74,26 +76,35 @@ public class GeoWaveBasicRasterIT extends
 	@BeforeClass
 	public static void startTimer() {
 		startMillis = System.currentTimeMillis();
-		LOGGER.warn("-----------------------------------------");
-		LOGGER.warn("*                                       *");
-		LOGGER.warn("*    RUNNING GeoWaveBasicRasterIT       *");
-		LOGGER.warn("*                                       *");
-		LOGGER.warn("-----------------------------------------");
+		LOGGER.warn(
+				"-----------------------------------------");
+		LOGGER.warn(
+				"*                                       *");
+		LOGGER.warn(
+				"*    RUNNING GeoWaveBasicRasterIT       *");
+		LOGGER.warn(
+				"*                                       *");
+		LOGGER.warn(
+				"-----------------------------------------");
 	}
 
 	@AfterClass
 	public static void reportTest() {
-		LOGGER.warn("-----------------------------------------");
-		LOGGER.warn("*                                       *");
-		LOGGER.warn("*      FINISHED GeoWaveBasicRasterIT         *");
-		LOGGER
-				.warn("*         " + ((System.currentTimeMillis() - startMillis) / 1000)
-						+ "s elapsed.                 *");
-		LOGGER.warn("*                                       *");
-		LOGGER.warn("-----------------------------------------");
+		LOGGER.warn(
+				"-----------------------------------------");
+		LOGGER.warn(
+				"*                                       *");
+		LOGGER.warn(
+				"*      FINISHED GeoWaveBasicRasterIT         *");
+		LOGGER.warn(
+				"*         " + ((System.currentTimeMillis() - startMillis) / 1000) + "s elapsed.                 *");
+		LOGGER.warn(
+				"*                                       *");
+		LOGGER.warn(
+				"-----------------------------------------");
 	}
 
-	@Test
+	// @Test
 	public void testNoDataMergeStrategy()
 			throws IOException {
 		final String coverageName = "testNoDataMergeStrategy";
@@ -111,7 +122,8 @@ public class GeoWaveBasicRasterIT extends
 				eastLon,
 				southLat,
 				northLat);
-		TestUtils.deleteAll(dataStoreOptions);
+		TestUtils.deleteAll(
+				dataStoreOptions);
 	}
 
 	@Test
@@ -183,7 +195,8 @@ public class GeoWaveBasicRasterIT extends
 				sumAndAveragingNumBands,
 				sumAndAveragingNumRasters,
 				new SumAndAveragingExpectedValue());
-		TestUtils.deleteAll(dataStoreOptions);
+		TestUtils.deleteAll(
+				dataStoreOptions);
 	}
 
 	private void ingestAndQueryNoDataMergeStrategy(
@@ -298,7 +311,8 @@ public class GeoWaveBasicRasterIT extends
 			}
 
 			// there should be exactly one
-			Assert.assertFalse(it.hasNext());
+			Assert.assertFalse(
+					it.hasNext());
 		}
 	}
 
@@ -488,20 +502,22 @@ public class GeoWaveBasicRasterIT extends
 		try (IndexWriter writer = dataStore.createWriter(
 				adapter,
 				TestUtils.DEFAULT_SPATIAL_INDEX)) {
-			writer.write(RasterUtils.createCoverageTypeDouble(
-					coverageName,
-					westLon,
-					eastLon,
-					southLat,
-					northLat,
-					raster1));
-			writer.write(RasterUtils.createCoverageTypeDouble(
-					coverageName,
-					westLon,
-					eastLon,
-					southLat,
-					northLat,
-					raster2));
+			writer.write(
+					RasterUtils.createCoverageTypeDouble(
+							coverageName,
+							westLon,
+							eastLon,
+							southLat,
+							northLat,
+							raster1));
+			writer.write(
+					RasterUtils.createCoverageTypeDouble(
+							coverageName,
+							westLon,
+							eastLon,
+							southLat,
+							northLat,
+							raster2));
 		}
 	}
 
@@ -554,13 +570,14 @@ public class GeoWaveBasicRasterIT extends
 						}
 					}
 				}
-				writer.write(RasterUtils.createCoverageTypeDouble(
-						coverageName,
-						westLon,
-						eastLon,
-						southLat,
-						northLat,
-						raster));
+				writer.write(
+						RasterUtils.createCoverageTypeDouble(
+								coverageName,
+								westLon,
+								eastLon,
+								southLat,
+								northLat,
+								raster));
 			}
 		}
 	}
@@ -631,11 +648,12 @@ public class GeoWaveBasicRasterIT extends
 								coverageName),
 						null),
 				new IndexOnlySpatialQuery(
-						new GeometryFactory().toGeometry(new Envelope(
-								westLon,
-								eastLon,
-								southLat,
-								northLat))))) {
+						new GeometryFactory().toGeometry(
+								new Envelope(
+										westLon,
+										eastLon,
+										southLat,
+										northLat))))) {
 			// the expected outcome is:
 			// band 1,2,3,4,5,6 has every value set correctly, band 0 has every
 			// even row set correctly and every odd row should be NaN, and band
@@ -671,7 +689,8 @@ public class GeoWaveBasicRasterIT extends
 			}
 
 			// there should be exactly one
-			Assert.assertFalse(it.hasNext());
+			Assert.assertFalse(
+					it.hasNext());
 		}
 	}
 
@@ -789,7 +808,7 @@ public class GeoWaveBasicRasterIT extends
 						null);
 				final MergeCounter mergeCounter = thisTile.getMetadata();
 				// we're merging, this is the incremented new number of merges
-				final int newNumMerges = mergeCounter.getNumMerges() +  nextTile.getMetadata().getNumMerges() + 1;
+				final int newNumMerges = mergeCounter.getNumMerges() + nextTile.getMetadata().getNumMerges() + 1;
 
 				// we've merged 1 more tile than the total number of merges (ie.
 				// if we've performed 1 merge, we've seen 2 tiles)
@@ -823,8 +842,9 @@ public class GeoWaveBasicRasterIT extends
 						}
 					}
 				}
-				thisTile.setMetadata(new MergeCounter(
-						newNumMerges));
+				thisTile.setMetadata(
+						new MergeCounter(
+								newNumMerges));
 			}
 		}
 
@@ -865,15 +885,18 @@ public class GeoWaveBasicRasterIT extends
 
 		@Override
 		public byte[] toBinary() {
-			final ByteBuffer buf = ByteBuffer.allocate(12);
-			buf.putInt(mergeCounter);
+			final ByteBuffer buf = ByteBuffer.allocate(
+					12);
+			buf.putInt(
+					mergeCounter);
 			return buf.array();
 		}
 
 		@Override
 		public void fromBinary(
 				final byte[] bytes ) {
-			final ByteBuffer buf = ByteBuffer.wrap(bytes);
+			final ByteBuffer buf = ByteBuffer.wrap(
+					bytes);
 			mergeCounter = buf.getInt();
 		}
 	}

@@ -29,6 +29,8 @@ import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.SampleModel;
 import java.awt.image.WritableRaster;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -37,6 +39,7 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.imageio.ImageIO;
 import javax.media.jai.BorderExtender;
 import javax.media.jai.Histogram;
 import javax.media.jai.Interpolation;
@@ -546,6 +549,15 @@ public class RasterUtils
 			final int posx = (int) ((coverageEnv.getMinimum(0) - requestEnvelope.getMinimum(0)) / levelResX);
 			final int posy = (int) ((requestEnvelope.getMaximum(1) - coverageEnv.getMaximum(1)) / levelResY);
 
+			File f = new File("C:\\Temp\\tile-hbase\\tile_" + posx + "_" + posy +".png" );
+			try {
+				f.createNewFile();
+			
+			ImageIO.write(coverageImage, "png",f);}
+			catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			image.getRaster().setRect(
 					posx,
 					posy,
@@ -662,6 +674,7 @@ public class RasterUtils
 				result,
 				resultEnvelope);
 	}
+	private static long i = 0;
 
 	@SuppressFBWarnings(value = {
 		"RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"
